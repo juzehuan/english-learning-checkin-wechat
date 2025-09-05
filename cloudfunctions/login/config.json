@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "openapi": [
+      "cloudbase.cloudcall",
+      "cloudbase.database"
+    ],
+    "databases": [
+      {
+        "permission": "readwrite",
+        "env": "cloud1-2gflwjg9b0331b73",
+        "collection": "users"
+      }
+    ]
+  }
+}

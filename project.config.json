@@ -1,0 +1,38 @@
+{
+    "setting": {
+        "es6": true,
+        "postcss": true,
+        "minified": true,
+        "uglifyFileName": false,
+        "enhance": true,
+        "packNpmRelationList": [],
+        "babelSetting": {
+            "ignore": [],
+            "disablePlugins": [],
+            "outputPath": ""
+        },
+        "useCompilerPlugins": false,
+        "minifyWXML": true
+    },
+    "compileType": "miniprogram",
+    "simulatorPluginLibVersion": {},
+    "packOptions": {
+        "ignore": [],
+        "include": []
+    },
+    "appid": "wx94c67ae786e01456",
+    "editorSetting": {},
+    "cloudfunctionRoot": "cloudfunctions",
+    "cloudfunctionTemplateRoot": "cloudfunctionTemplate",
+    "cloudEnvironment": "cloud1-2gflwjg9b0331b73",
+    "debugOptions": {
+        "hidedInDevtools": []
+    },
+    "packNpmManually": true,
+    "packNpmRelationList": [
+    {
+    "packageJsonPath": "./package.json",
+    "miniprogramNpmDistDir": "./miniprogram/"
+    }
+    ]
+}
