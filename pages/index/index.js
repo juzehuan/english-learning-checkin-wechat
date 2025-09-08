@@ -32,10 +32,14 @@ Page({
     db.collection('users').doc(getApp().globalData.userInfo._id).get({
       success: res => {
         this.setData({
+          userInfo: res.data, // 更新用户信息
           score: res.data.score || 0,
           totalDays: res.data.progress?.totalDays || 0,
           consecutiveDays: res.data.progress?.consecutiveDays || 0
         });
+        
+        // 同时更新全局用户信息
+        getApp().globalData.userInfo = res.data;
       },
       fail: err => {
         wx.showToast({
