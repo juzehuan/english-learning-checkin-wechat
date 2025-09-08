@@ -4,7 +4,9 @@ Page({
     friends: [],
     searchUserId: '',
     loading: true,
-    userInfo: null
+    userInfo: null,
+    friendRequests: [], // 新增：好友请求列表
+    showRequests: false // 新增：是否显示好友请求
   },
 
   onLoad: function() {
@@ -16,64 +18,71 @@ Page({
       });
     }
     this.fetchFriendList();
+    this.fetchFriendRequests(); // 新增：获取好友请求
+  },
+
+  onShow: function() {
+    // 页面显示时刷新好友列表和好友请求
+    this.fetchFriendList();
+    this.fetchFriendRequests();
   },
 
   /**
-   * 获取好友列表
+   * 获取好友列表 - 使用新的getFriends操作
    */
   fetchFriendList: function() {
-    const db = wx.cloud.database();
-    const userId = getApp().globalData.userInfo._id;
+    this.setData({ loading: true });
 
-    wx.showLoading({
-      title: '加载中...',
-    });
-
-    // 获取当前用户的好友列表
-    db.collection('users').doc(userId).get({
+    wx.cloud.callFunction({
+      name: 'friendRelation',
+      data: {
+        action: 'getFriends'
+      },
       success: res => {
-        const userData = res.data;
-        const friendIds = userData.friends || [];
-        
-        if (friendIds.length > 0) {
-          // 根据好友ID获取好友详细信息
-          db.collection('users').where({
-            _id: db.command.in(friendIds)
-          }).get({
-            success: friendsRes => {
-              this.setData({
-                friends: friendsRes.data,
-                loading: false
-              });
-              wx.hideLoading();
-            },
-            fail: err => {
-              console.error('[数据库] [查询好友列表] 失败：', err);
-              wx.hideLoading();
-              wx.showToast({
-                title: '获取好友列表失败',
-                icon: 'none'
-              });
-              this.setData({ loading: false });
-            }
-          });
-        } else {
-          this.setData({ 
-            friends: [],
-            loading: false 
-          });
-          wx.hideLoading();
-        }
+        console.log('[云函数] [getFriends] 成功：', res.result);
+        this.setData({
+          friends: res.result.data || [],
+          loading: false
+        });
       },
       fail: err => {
-        console.error('[数据库] [查询用户信息] 失败：', err);
-        wx.hideLoading();
+        console.error('[云函数] [getFriends] 失败：', err);
+        this.setData({ loading: false });
         wx.showToast({
-          title: '获取数据失败',
+          title: '获取好友列表失败',
           icon: 'none'
         });
-        this.setData({ loading: false });
       }
+    });
+  },
+
+  /**
+   * 新增：获取好友请求列表
+   */
+  fetchFriendRequests: function() {
+    wx.cloud.callFunction({
+      name: 'friendRelation',
+      data: {
+        action: 'getRequests'
+      },
+      success: res => {
+        console.log('[云函数] [getRequests] 成功：', res.result);
+        this.setData({
+          friendRequests: res.result.data || []
+        });
+      },
+      fail: err => {
+        console.error('[云函数] [getRequests] 失败：', err);
+      }
+    });
+  },
+
+  /**
+   * 新增：显示/隐藏好友请求
+   */
+  toggleFriendRequests: function() {
+    this.setData({
+      showRequests: !this.data.showRequests
     });
   },
 
@@ -81,20 +90,24 @@ Page({
    * 输入框内容变化
    */
   onInputChange: function(e) {
+    console.log('输入框内容变化:', e.detail.value);
     this.setData({
       searchUserId: e.detail.value
     });
   },
 
   /**
-   * 添加好友
+   * 添加好友 - 使用新的sendRequest操作
    */
   addFriend: function() {
-    const db = wx.cloud.database();
+    console.log('addFriend方法被调用');
+    
+    const targetUserId = this.data.searchUserId.trim();
     const userId = getApp().globalData.userInfo._id;
-    const friendId = this.data.searchUserId.trim();
 
-    if (!friendId) {
+    console.log('好友ID:', targetUserId);
+    
+    if (!targetUserId) {
       wx.showToast({
         title: '请输入好友ID',
         icon: 'none'
@@ -102,7 +115,7 @@ Page({
       return;
     }
 
-    if (friendId === userId) {
+    if (targetUserId === userId) {
       wx.showToast({
         title: '不能添加自己为好友',
         icon: 'none'
@@ -110,66 +123,43 @@ Page({
       return;
     }
 
-    // 检查好友是否已存在
-    db.collection('users').doc(userId).get({
+    wx.showLoading({
+      title: '发送请求中...',
+    });
+
+    wx.cloud.callFunction({
+      name: 'friendRelation',
+      data: {
+        action: 'sendRequest',
+        targetUserId: targetUserId
+      },
       success: res => {
-        const userData = res.data;
-        const friends = userData.friends || [];
+        console.log('[云函数] [sendRequest] 成功：', res.result);
+        wx.hideLoading();
         
-        if (friends.includes(friendId)) {
+        if (res.result.success) {
           wx.showToast({
-            title: '好友已存在',
+            title: res.result.message || '好友请求已发送',
+            icon: 'success'
+          });
+          
+          // 清空输入框
+          this.setData({ searchUserId: '' });
+          
+          // 刷新好友请求列表
+          this.fetchFriendRequests();
+        } else {
+          wx.showToast({
+            title: res.result.message || '发送请求失败',
             icon: 'none'
           });
-          return;
         }
-
-        // 检查好友是否存在
-        db.collection('users').doc(friendId).get({
-          success: friendRes => {
-            // 更新当前用户的好友列表
-            friends.push(friendId);
-            
-            db.collection('users').doc(userId).update({
-              data: {
-                friends: friends,
-                updateTime: db.serverDate()
-              },
-              success: () => {
-                // 也更新全局用户信息
-                getApp().globalData.userInfo.friends = friends;
-                
-                wx.showToast({
-                  title: '添加好友成功',
-                  icon: 'success'
-                });
-                
-                // 刷新好友列表
-                this.fetchFriendList();
-                this.setData({ searchUserId: '' });
-              },
-              fail: err => {
-                console.error('[数据库] [更新好友列表] 失败：', err);
-                wx.showToast({
-                  title: '添加好友失败',
-                  icon: 'none'
-                });
-              }
-            });
-          },
-          fail: err => {
-            console.error('[数据库] [查询好友信息] 失败：', err);
-            wx.showToast({
-              title: '用户不存在',
-              icon: 'none'
-            });
-          }
-        });
       },
       fail: err => {
-        console.error('[数据库] [查询用户信息] 失败：', err);
+        console.error('[云函数] [sendRequest] 失败：', err);
+        wx.hideLoading();
         wx.showToast({
-          title: '操作失败',
+          title: '发送请求失败',
           icon: 'none'
         });
       }
@@ -177,11 +167,102 @@ Page({
   },
 
   /**
-   * 删除好友
+   * 新增：接受好友请求
+   */
+  acceptFriendRequest: function(e) {
+    const requestId = e.currentTarget.dataset.id;
+    
+    wx.showLoading({
+      title: '处理中...',
+    });
+
+    wx.cloud.callFunction({
+      name: 'friendRelation',
+      data: {
+        action: 'acceptRequest',
+        requestId: requestId
+      },
+      success: res => {
+        console.log('[云函数] [acceptRequest] 成功：', res.result);
+        wx.hideLoading();
+        
+        if (res.result.success) {
+          wx.showToast({
+            title: '已添加为好友',
+            icon: 'success'
+          });
+          
+          // 刷新好友列表和请求列表
+          this.fetchFriendList();
+          this.fetchFriendRequests();
+        } else {
+          wx.showToast({
+            title: res.result.message || '处理失败',
+            icon: 'none'
+          });
+        }
+      },
+      fail: err => {
+        console.error('[云函数] [acceptRequest] 失败：', err);
+        wx.hideLoading();
+        wx.showToast({
+          title: '处理失败',
+          icon: 'none'
+        });
+      }
+    });
+  },
+
+  /**
+   * 新增：拒绝好友请求
+   */
+  rejectFriendRequest: function(e) {
+    const requestId = e.currentTarget.dataset.id;
+    
+    wx.showLoading({
+      title: '处理中...',
+    });
+
+    wx.cloud.callFunction({
+      name: 'friendRelation',
+      data: {
+        action: 'rejectRequest',
+        requestId: requestId
+      },
+      success: res => {
+        console.log('[云函数] [rejectRequest] 成功：', res.result);
+        wx.hideLoading();
+        
+        if (res.result.success) {
+          wx.showToast({
+            title: '已拒绝请求',
+            icon: 'success'
+          });
+          
+          // 刷新请求列表
+          this.fetchFriendRequests();
+        } else {
+          wx.showToast({
+            title: res.result.message || '处理失败',
+            icon: 'none'
+          });
+        }
+      },
+      fail: err => {
+        console.error('[云函数] [rejectRequest] 失败：', err);
+        wx.hideLoading();
+        wx.showToast({
+          title: '处理失败',
+          icon: 'none'
+        });
+      }
+    });
+  },
+
+  /**
+   * 删除好友 - 使用新的deleteFriend操作
    */
   deleteFriend: function(e) {
-    const db = wx.cloud.database();
-    const userId = getApp().globalData.userInfo._id;
     const friendId = e.currentTarget.dataset.id;
     const friendName = e.currentTarget.dataset.name;
 
@@ -190,49 +271,40 @@ Page({
       content: `确定要删除好友 ${friendName} 吗？`,
       success: modalRes => {
         if (modalRes.confirm) {
-          // 获取当前用户的好友列表
-          db.collection('users').doc(userId).get({
+          wx.showLoading({
+            title: '删除中...',
+          });
+
+          wx.cloud.callFunction({
+            name: 'friendRelation',
+            data: {
+              action: 'deleteFriend',
+              friendId: friendId
+            },
             success: res => {
-              const userData = res.data;
-              const friends = userData.friends || [];
+              console.log('[云函数] [deleteFriend] 成功：', res.result);
+              wx.hideLoading();
               
-              // 从好友列表中删除
-              const index = friends.indexOf(friendId);
-              if (index > -1) {
-                friends.splice(index, 1);
+              if (res.result.success) {
+                wx.showToast({
+                  title: '删除好友成功',
+                  icon: 'success'
+                });
+                
+                // 刷新好友列表
+                this.fetchFriendList();
+              } else {
+                wx.showToast({
+                  title: res.result.message || '删除失败',
+                  icon: 'none'
+                });
               }
-              
-              // 更新数据库
-              db.collection('users').doc(userId).update({
-                data: {
-                  friends: friends,
-                  updateTime: db.serverDate()
-                },
-                success: () => {
-                  // 更新全局用户信息
-                  getApp().globalData.userInfo.friends = friends;
-                  
-                  wx.showToast({
-                    title: '删除好友成功',
-                    icon: 'success'
-                  });
-                  
-                  // 刷新好友列表
-                  this.fetchFriendList();
-                },
-                fail: err => {
-                  console.error('[数据库] [更新好友列表] 失败：', err);
-                  wx.showToast({
-                    title: '删除好友失败',
-                    icon: 'none'
-                  });
-                }
-              });
             },
             fail: err => {
-              console.error('[数据库] [查询用户信息] 失败：', err);
+              console.error('[云函数] [deleteFriend] 失败：', err);
+              wx.hideLoading();
               wx.showToast({
-                title: '操作失败',
+                title: '删除失败',
                 icon: 'none'
               });
             }

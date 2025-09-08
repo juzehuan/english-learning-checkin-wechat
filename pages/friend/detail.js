@@ -89,11 +89,9 @@ Page({
   },
 
   /**
-   * 删除好友
+   * 删除好友 - 使用新的deleteFriend操作
    */
   deleteFriend: function() {
-    const db = wx.cloud.database();
-    const userId = getApp().globalData.userInfo._id;
     const friendId = this.data.friendId;
     const friendName = this.data.friendInfo?.nickName || '未设置昵称';
 
@@ -102,51 +100,42 @@ Page({
       content: `确定要删除好友 ${friendName} 吗？`,
       success: modalRes => {
         if (modalRes.confirm) {
-          // 获取当前用户的好友列表
-          db.collection('users').doc(userId).get({
+          wx.showLoading({
+            title: '删除中...',
+          });
+
+          wx.cloud.callFunction({
+            name: 'friendRelation',
+            data: {
+              action: 'deleteFriend',
+              friendId: friendId
+            },
             success: res => {
-              const userData = res.data;
-              const friends = userData.friends || [];
+              console.log('[云函数] [deleteFriend] 成功：', res.result);
+              wx.hideLoading();
               
-              // 从好友列表中删除
-              const index = friends.indexOf(friendId);
-              if (index > -1) {
-                friends.splice(index, 1);
+              if (res.result.success) {
+                wx.showToast({
+                  title: '删除好友成功',
+                  icon: 'success'
+                });
+                
+                // 返回上一页
+                setTimeout(() => {
+                  wx.navigateBack();
+                }, 1500);
+              } else {
+                wx.showToast({
+                  title: res.result.message || '删除失败',
+                  icon: 'none'
+                });
               }
-              
-              // 更新数据库
-              db.collection('users').doc(userId).update({
-                data: {
-                  friends: friends,
-                  updateTime: db.serverDate()
-                },
-                success: () => {
-                  // 更新全局用户信息
-                  getApp().globalData.userInfo.friends = friends;
-                  
-                  wx.showToast({
-                    title: '删除好友成功',
-                    icon: 'success'
-                  });
-                  
-                  // 返回上一页
-                  setTimeout(() => {
-                    wx.navigateBack();
-                  }, 1500);
-                },
-                fail: err => {
-                  console.error('[数据库] [更新好友列表] 失败：', err);
-                  wx.showToast({
-                    title: '删除好友失败',
-                    icon: 'none'
-                  });
-                }
-              });
             },
             fail: err => {
-              console.error('[数据库] [查询用户信息] 失败：', err);
+              console.error('[云函数] [deleteFriend] 失败：', err);
+              wx.hideLoading();
               wx.showToast({
-                title: '操作失败',
+                title: '删除失败',
                 icon: 'none'
               });
             }

@@ -46,8 +46,44 @@ exports.main = async (event, context) => {
     }).get();
 
     if (userResult.data && userResult.data.length > 0) {
-      // 用户已存在，返回用户信息
+      // 用户已存在，检查是否需要更新用户信息
       const user = userResult.data[0];
+      
+      // 如果传入了新的用户信息，并且与现有信息不同，则更新
+      if (userInfo && (userInfo.nickName !== user.nickName || userInfo.avatarUrl !== user.avatarUrl)) {
+        try {
+          await db.collection('users').doc(user._id).update({
+            data: {
+              nickName: userInfo.nickName,
+              avatarUrl: userInfo.avatarUrl,
+              gender: userInfo.gender || 0,
+              city: userInfo.city || '',
+              province: userInfo.province || '',
+              country: userInfo.country || '',
+              language: userInfo.language || '',
+              updateTime: db.serverDate()
+            }
+          });
+          
+          // 重新查询更新后的用户信息
+          const updatedUser = await db.collection('users').doc(user._id).get();
+          return {
+            success: true,
+            openid: openid,
+            user: updatedUser.data
+          };
+        } catch (updateError) {
+          console.error('更新用户信息失败:', updateError);
+          // 更新失败时仍然返回原始用户信息
+          return {
+            success: true,
+            openid: openid,
+            user: user
+          };
+        }
+      }
+      
+      // 用户已存在且信息不需要更新，直接返回用户信息
       return {
         success: true,
         openid: openid,

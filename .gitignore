@@ -108,6 +108,9 @@ cloudfunctions/login/node_modules/
 cloudfunctions/recordQuiz/node_modules/
 cloudfunctions/useSkipCard/node_modules/
 cloudfunctions/useSkipQuiz/node_modules/
+cloudfunctions/friendRelation/node_modules/
+cloudfunctions/updateUserInfo/node_modules/
+
 
 # Docusaurus cache and generated files
 .docusaurus
