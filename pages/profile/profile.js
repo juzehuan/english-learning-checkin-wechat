@@ -291,11 +291,20 @@ Page({
   },
 
   /**
-   * 设置页面
+   * 跳转到抽背记录页面
+   */
+  navigateToQuizHistory: function() {
+    wx.navigateTo({
+      url: '/pages/quizHistory/quizHistory'
+    });
+  },
+
+  /**
+   * 跳转到设置页面
    */
   navigateToSettings: function() {
     wx.navigateTo({
-      url: '/pages/settings/index'
+      url: '/pages/settings/settings'
     });
   }
 });

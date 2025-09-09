@@ -6,7 +6,8 @@
     "pages/quiz/quiz",
     "pages/profile/profile",
     "pages/statistics/statistics",
-    "pages/friend/manage"
+    "pages/friend/manage",
+    "pages/quizHistory/quizHistory"
   ],
   "window": {
     "backgroundTextStyle": "light",
@@ -33,7 +34,7 @@
       },
       {
         "pagePath": "pages/quiz/quiz",
-        "text": "抽背记录",
+        "text": "抽背",
         "iconPath": "images/quiz.png",
         "selectedIconPath": "images/quiz_selected.png"
       },

@@ -414,33 +414,97 @@ async function handleGetFriends(currentUserOpenid) {
       return {
         success: true,
         friends: [],
-        total: 0
+        total: 0,
+        debugInfo: '没有好友关系'
       };
     }
     
-    // 获取好友的详细信息
-    const friendsResult = await db.collection('users')
-      .where({ openid: _.in(friendOpenids) })
-      .field({
-        _id: true,
-        nickName: true,
-        avatarUrl: true,
-        score: true,
-        progress: true,
-        openid: true
-      })
-      .get();
+    console.log('[handleGetFriends] 好友openid列表:', friendOpenids);
     
-    return {
-      success: true,
-      friends: friendsResult.data,
-      total: friendsResult.data.length
-    };
+    try {
+      // 获取好友的详细信息
+      const friendsResult = await db.collection('users')
+        .where({ openid: _.in(friendOpenids) })
+        .field({
+          _id: true,
+          nickName: true,
+          avatarUrl: true,
+          score: true,
+          progress: true,
+          openid: true
+        })
+        .get();
+      
+      console.log('[handleGetFriends] 查询到的用户信息数量:', friendsResult.data.length);
+      
+      // 创建好友openid到用户信息的映射
+      const userMap = {};
+      friendsResult.data.forEach(user => {
+        userMap[user.openid] = user;
+      });
+      
+      // 为每个好友关系创建一个基本的用户信息对象，如果找不到完整信息
+      const friends = relationResult.data.map(item => {
+        const friendOpenid = item.userId === currentUserOpenid ? item.friendId : item.userId;
+        const userInfo = userMap[friendOpenid];
+        
+        // 如果找到了用户信息，直接返回；否则创建一个基本的用户对象
+        if (userInfo) {
+          return userInfo;
+        } else {
+          console.warn(`[handleGetFriends] 未找到openid为${friendOpenid}的用户信息`);
+          return {
+            openid: friendOpenid,
+            nickName: '未知用户',
+            avatarUrl: '',
+            _id: friendOpenid,
+            isMissingInfo: true
+          };
+        }
+      });
+      
+      return {
+        success: true,
+        friends: friends,
+        total: friends.length,
+        debugInfo: {
+          relationCount: relationResult.data.length,
+          foundUserCount: friendsResult.data.length,
+          missingUserCount: friends.length - friendsResult.data.length
+        }
+      };
+    } catch (userInfoError) {
+      console.error('[handleGetFriends] 获取用户信息失败:', userInfoError);
+      
+      // 即使获取用户信息失败，也返回基本的好友列表
+      const friends = relationResult.data.map(item => {
+        const friendOpenid = item.userId === currentUserOpenid ? item.friendId : item.userId;
+        return {
+          openid: friendOpenid,
+          nickName: '未知用户',
+          avatarUrl: '',
+          _id: friendOpenid,
+          isMissingInfo: true
+        };
+      });
+      
+      return {
+        success: true,
+        friends: friends,
+        total: friends.length,
+        message: '部分好友信息获取失败',
+        debugInfo: {
+          relationCount: relationResult.data.length,
+          error: userInfoError.message
+        }
+      };
+    }
   } catch (error) {
     console.error('获取好友列表失败:', error);
     return {
       success: false,
-      message: '获取好友列表失败，请稍后重试'
+      message: '获取好友列表失败，请稍后重试',
+      error: error.message
     };
   }
 }

@@ -61,26 +61,38 @@ Page({
       console.log('全局用户信息:', app.globalData.userInfo);
       console.log('全局OpenID:', app.globalData.openid);
       
-      // 直接查询好友请求表
+      // 直接查询好友关系表 - 包含已接受的好友关系
       const db = wx.cloud.database();
-      const res = await db.collection('friendships')
+      const friendRes = await db.collection('friendships')
+        .where({
+          $or: [
+            { userId: app.globalData.openid, status: 'accepted' },
+            { friendId: app.globalData.openid, status: 'accepted' }
+          ]
+        })
+        .get();
+      
+      // 查询好友请求表
+      const requestRes = await db.collection('friendships')
         .where({
           friendId: app.globalData.openid,
           status: 'pending'
         })
         .get();
       
-      console.log('[直接查询] 好友请求结果:', res.data);
+      console.log('[直接查询] 好友关系结果:', friendRes.data);
+      console.log('[直接查询] 好友请求结果:', requestRes.data);
       wx.hideLoading();
       
       // 显示测试结果弹窗
       wx.showModal({
         title: '测试结果',
-        content: `用户OpenID: ${app.globalData.openid || '未获取到'}\n\n用户信息: ${app.globalData.userInfo ? '已存在' : '不存在'}\n\n好友请求数: ${res.data.length}\n\n${res.data.length > 0 ? '请求详情:\n' + JSON.stringify(res.data) : ''}`,
+        content: `用户OpenID: ${app.globalData.openid || '未获取到'}\n\n用户信息: ${app.globalData.userInfo ? '已存在' : '不存在'}\n\n好友关系数: ${friendRes.data.length}\n\n好友请求数: ${requestRes.data.length}\n\n${friendRes.data.length > 0 ? '好友关系详情:\n' + JSON.stringify(friendRes.data) : ''}`,
         showCancel: false,
         confirmText: '刷新列表',
         success: (res) => {
           if (res.confirm) {
+            this.fetchFriendList();
             this.fetchFriendRequests();
           }
         }

@@ -108,11 +108,20 @@ Page({
   },
 
   /**
-   * 跳转到抽背记录页面
+   * 跳转到抽背页面
    */
   navigateToQuiz: function() {
     wx.switchTab({
       url: '/pages/quiz/quiz'
+    });
+  },
+
+  /**
+   * 跳转到抽背历史记录页面
+   */
+  navigateToQuizHistory: function() {
+    wx.navigateTo({
+      url: '/pages/quizHistory/quizHistory'
     });
   },
 

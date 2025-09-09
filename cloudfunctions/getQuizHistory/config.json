@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "openapi": [],
+    "env": {
+      "database": {
+        "read": true,
+        "write": true
+      },
+      "storage": {
+        "read": true,
+        "write": true
+      },
+      "cloudfunction": {
+        "invoke": true
+      }
+    }
+  },
+  "runtime": "Nodejs12",
+  "timeout": 30000
+}
