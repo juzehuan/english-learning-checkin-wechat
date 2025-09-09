@@ -16,32 +16,37 @@ Page({
   },
 
   /**
-   * 获取好友列表
+   * 获取好友列表 - 通过调用friendRelation云函数
    */
   fetchFriendList: function() {
-    const db = wx.cloud.database();
-    const userId = getApp().globalData.userInfo._id;
-
-    db.collection('users').doc(userId).get({
+    wx.cloud.callFunction({
+      name: 'friendRelation',
+      data: {
+        action: 'getFriends'
+      },
       success: res => {
-        const friendIds = res.data.friends || [];
-        if (friendIds.length > 0) {
-          db.collection('users').where({
-            _id: db.command.in(friendIds)
-          }).get({
-            success: res => {
-              this.setData({
-                friendList: res.data
-              });
-            },
-            fail: err => {
-              console.error('[数据库] [查询好友列表] 失败：', err);
-            }
+        console.log('[云函数] [getFriends] 成功：', res.result);
+        if (res.result.success) {
+          this.setData({
+            friendList: res.result.friends || []
+          });
+          console.log('[获取好友列表] 好友数量：', (res.result.friends || []).length);
+          // 同时更新全局好友列表
+          getApp().globalData.friendList = res.result.friends || [];
+        } else {
+          console.error('[云函数] [getFriends] 失败：', res.result.message);
+          wx.showToast({
+            title: '获取好友列表失败',
+            icon: 'none'
           });
         }
       },
       fail: err => {
-        console.error('[数据库] [查询用户信息] 失败：', err);
+        console.error('[云函数] [friendRelation] 调用失败：', err);
+        wx.showToast({
+          title: '网络错误，请稍后重试',
+          icon: 'none'
+        });
       }
     });
   },

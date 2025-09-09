@@ -6,8 +6,7 @@
     "pages/quiz/quiz",
     "pages/profile/profile",
     "pages/statistics/statistics",
-    "pages/friend/manage",
-    "pages/friend/detail"
+    "pages/friend/manage"
   ],
   "window": {
     "backgroundTextStyle": "light",
