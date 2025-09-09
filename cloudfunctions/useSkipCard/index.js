@@ -107,7 +107,6 @@ exports.main = async (event, context) => {
       user: updatedUser.data
     };
   } catch (error) {
-    console.error('[云函数] [useSkipCard] 错误：', error);
     return {
       success: false,
       message: '操作失败',

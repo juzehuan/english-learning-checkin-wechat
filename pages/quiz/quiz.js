@@ -35,11 +35,10 @@ Page({
           this.setData({
             friendList: friends
           });
-          console.log('[抽背页面] 好友列表加载成功，数量：', friends.length);
           // 更新全局好友列表
           getApp().globalData.friendList = friends;
         } else {
-          console.error('[抽背页面] 好友列表加载失败：', res.result?.message || '未知错误');
+
           wx.showToast({
             title: '获取好友列表失败',
             icon: 'none'
@@ -48,7 +47,7 @@ Page({
       },
       fail: err => {
         wx.hideLoading();
-        console.error('[抽背页面] 好友列表请求失败：', err);
+        
         wx.showToast({
           title: '网络错误，请稍后重试',
           icon: 'none'
@@ -63,7 +62,6 @@ Page({
   fetchUserPrivileges: function() {
     const app = getApp();
     if (!app.globalData.userInfo || !app.globalData.userInfo._id) {
-      console.error('[抽背页面] 未获取到用户信息');
       return;
     }
     
@@ -76,7 +74,6 @@ Page({
         });
       },
       fail: err => {
-        console.error('[抽背页面] 查询用户特权失败：', err);
       }
     });
   },
@@ -90,7 +87,6 @@ Page({
     
     // 确保friendId是openid格式
     if (!friendId || typeof friendId !== 'string') {
-      console.error('[抽背页面] 无效的好友ID：', friendId);
       return;
     }
     
@@ -101,8 +97,6 @@ Page({
       correctCount: 0,
       wrongCount: 0
     });
-    
-    console.log('[抽背页面] 选择好友：', { friendId, friendName });
   },
 
   /**
@@ -115,7 +109,6 @@ Page({
       correctCount: 0,
       wrongCount: 0
     });
-    console.log('[抽背页面] 清除好友选择');
   },
 
   /**
@@ -150,13 +143,7 @@ Page({
   submitQuiz: function() {
     const { correctCount, wrongCount, selectedFriendId, selectedFriendName } = this.data;
     
-    // 详细日志记录
-    console.log('[抽背页面] 提交抽背结果：', {
-      correctCount,
-      wrongCount,
-      selectedFriendId,
-      selectedFriendName
-    });
+
     
     // 输入验证
     if (!selectedFriendId) {
@@ -200,7 +187,6 @@ Page({
         wx.hideLoading();
         
         if (res.result && res.result.success) {
-          console.log('[抽背页面] 抽背结果提交成功：', res.result);
           wx.showToast({
             title: '记录成功！',
             icon: 'success'
@@ -210,7 +196,7 @@ Page({
             wx.navigateBack();
           }, 1500);
         } else {
-          console.error('[抽背页面] 抽背结果提交失败：', res.result?.message || '未知错误');
+
           wx.showToast({
             title: res.result?.message || '提交失败',
             icon: 'none',
@@ -220,7 +206,7 @@ Page({
       },
       fail: err => {
         wx.hideLoading();
-        console.error('[抽背页面] 云函数调用失败：', err);
+
         wx.showToast({
           title: '网络错误，请稍后重试',
           icon: 'none'
@@ -301,7 +287,7 @@ Page({
       },
       fail: err => {
         wx.hideLoading();
-        console.error('[抽背页面] 使用特权失败：', err);
+
         wx.showToast({
           title: '网络错误，请稍后重试',
           icon: 'none'

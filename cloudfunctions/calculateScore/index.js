@@ -104,7 +104,6 @@ exports.main = async (event, context) => {
       totalUsers: users.length
     };
   } catch (error) {
-    console.error('[云函数] [calculateScore] 错误:', error);
     return {
       success: false,
       message: '积分结算失败',

@@ -85,7 +85,6 @@ exports.main = async (event, context) => {
       skipQuizCardCount: updatedUserInfo.data.skipQuizCardCount || 0
     };
   } catch (error) {
-    console.error('[云函数] [useSkipQuiz] 错误:', error);
     return {
       success: false,
       message: '操作失败，请稍后重试',

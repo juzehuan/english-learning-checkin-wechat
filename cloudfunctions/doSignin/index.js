@@ -101,7 +101,6 @@ exports.main = async (event, context) => {
       user: updatedUser.data
     };
   } catch (error) {
-    console.error('[云函数] [doSignin] 错误：', error);
     return {
       success: false,
       message: '打卡失败',

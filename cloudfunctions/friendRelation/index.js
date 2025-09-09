@@ -492,15 +492,10 @@ async function handleGetFriends(currentUserOpenid) {
         success: true,
         friends: friends,
         total: friends.length,
-        message: '部分好友信息获取失败',
-        debugInfo: {
-          relationCount: relationResult.data.length,
-          error: userInfoError.message
-        }
+        message: '部分好友信息获取失败'
       };
     }
   } catch (error) {
-    console.error('获取好友列表失败:', error);
     return {
       success: false,
       message: '获取好友列表失败，请稍后重试',
@@ -516,14 +511,9 @@ async function handleGetFriends(currentUserOpenid) {
  */
 async function handleGetRequests(currentUserOpenid) {
   try {
-    console.log('[handleGetRequests] 开始获取好友请求，当前用户openid:', currentUserOpenid);
-    
     // 先获取当前用户信息，得到用户ID
     const currentUser = await getUserInfo(currentUserOpenid);
     const currentUserId = currentUser?._id || currentUserOpenid;
-    
-    console.log('[handleGetRequests] 当前用户信息:', currentUser);
-    console.log('[handleGetRequests] 当前用户ID:', currentUserId);
     
     // 查询当前用户收到的好友请求 - 同时匹配friendId为OpenID或用户ID的请求
     const requestsResult = await db.collection('friendships')
@@ -534,13 +524,8 @@ async function handleGetRequests(currentUserOpenid) {
       .orderBy('requestTime', 'desc')
       .get();
     
-    console.log('[handleGetRequests] 查询结果:', requestsResult.data);
-    console.log('[handleGetRequests] 请求数量:', requestsResult.data.length);
-    
     // 提取请求用户ID列表
     const requestUserIds = requestsResult.data.map(request => request.userId);
-    
-    console.log('[handleGetRequests] 请求用户ID列表:', requestUserIds);
     
     // 构建用户ID到用户信息的映射 - 使用getUserInfo函数，它支持通过ID或openid查询
     const userMap = {};
@@ -557,36 +542,22 @@ async function handleGetRequests(currentUserOpenid) {
       await Promise.all(userInfoPromises);
     }
     
-    console.log('[handleGetRequests] 用户信息映射:', userMap);
-    
     // 合并好友请求和用户信息
     const requests = requestsResult.data.map(request => ({
       ...request,
       userInfo: userMap[request.userId] || { nickName: '未知用户', avatarUrl: '/images/avatar.png' }
     }));
     
-    console.log('[handleGetRequests] 最终返回的请求列表:', requests);
-    
     return {
       success: true,
       requests: requests,
-      total: requests.length,
-      debugInfo: {
-        currentUserOpenid,
-        currentUserId,
-        requestCount: requestsResult.data.length,
-        userInfoCount: Object.keys(userMap).length
-      }
+      total: requests.length
     };
   } catch (error) {
-    console.error('获取好友请求失败:', error);
     return {
       success: false,
       message: '获取好友请求失败，请稍后重试',
-      error: error.message,
-      debugInfo: {
-        currentUserOpenid
-      }
+      error: error.message
     };
   }
 }
@@ -666,7 +637,6 @@ async function handleCheckRelation(currentUserOpenid, targetUserId) {
       relation: 'none'
     };
   } catch (error) {
-    console.error('检查关系失败:', error);
     return {
       success: false,
       message: '检查关系失败，请稍后重试'

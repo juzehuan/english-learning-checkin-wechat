@@ -158,7 +158,6 @@ exports.main = async (event, context) => {
       }
     };
   } catch (error) {
-    console.error('[云函数] [getQuizHistory] 错误：', error);
     return {
       success: false,
       message: '获取失败，请稍后重试',

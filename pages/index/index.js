@@ -46,7 +46,6 @@ Page({
           title: '获取数据失败',
           icon: 'none'
         });
-        console.error('[数据库] [查询记录] 失败：', err);
       }
     });
   },
@@ -93,7 +92,6 @@ Page({
         });
       },
       fail: err => {
-        console.error('[数据库] [查询周报] 失败：', err);
       }
     });
   },

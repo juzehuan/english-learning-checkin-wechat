@@ -53,7 +53,6 @@ Page({
         }
       },
       fail: err => {
-        console.error('[数据库] [查询打卡记录] 失败：', err);
       }
     });
   },
@@ -79,7 +78,6 @@ Page({
         });
       },
       fail: err => {
-        console.error('[数据库] [查询用户进度] 失败：', err);
       }
     });
   },
@@ -160,7 +158,6 @@ Page({
           title: '打卡失败',
           icon: 'none'
         });
-        console.error('[云函数] [doSignin] 调用失败：', err);
       }
     });
   },
@@ -238,7 +235,6 @@ Page({
           title: '操作失败',
           icon: 'none'
         });
-        console.error('[云函数] [useSkipCard] 调用失败：', err);
       }
     });
   }

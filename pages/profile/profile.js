@@ -7,7 +7,6 @@ Page({
       totalDays: 0,
       consecutiveDays: 0
     },
-    friendCount: 0,
     privileges: {
       skipCardCount: 0,
       skipQuizCount: 0
@@ -39,13 +38,12 @@ Page({
         this.setData({
           score: userData.score || 0,
           progress: userData.progress || { totalDays: 0, consecutiveDays: 0 },
-          friendCount: userData.friends ? userData.friends.length : 0,
           privileges: {
             skipCardCount: userData.skipCardCount || 0,
             skipQuizCount: userData.skipQuizCount || 0
           }
         });
-        
+
         // 更新全局用户信息
         getApp().globalData.userInfo = userData;
       },
@@ -103,12 +101,12 @@ Page({
         // 获取选择的头像临时文件路径
         const avatarUrl = res.tempFilePaths[0];
         console.log('选择的头像:', avatarUrl);
-        
+
         // 先更新本地用户信息显示
         const userInfo = {...that.data.userInfo};
         userInfo.avatarUrl = avatarUrl;
         that.setData({ userInfo });
-        
+
         // 上传头像并更新用户信息
         that.uploadAvatarAndUpdateUserInfo(avatarUrl);
       },
@@ -130,11 +128,11 @@ Page({
     wx.showLoading({
       title: '上传中...',
     });
-    
+
     // 生成一个唯一的文件名
     const timestamp = Date.now();
     const cloudPath = `avatars/${getApp().globalData.userInfo._id}_${timestamp}.png`;
-    
+
     // 上传头像到云存储
     wx.cloud.uploadFile({
       cloudPath: cloudPath,
@@ -143,7 +141,7 @@ Page({
         // 获取上传后的文件ID
         const fileID = res.fileID;
         console.log('头像上传成功，fileID:', fileID);
-        
+
         // 调用云函数更新用户信息
         that.updateUserInfo({
           avatarUrl: fileID
@@ -167,7 +165,7 @@ Page({
   openProfileEditor: function() {
     const that = this;
     const currentNickname = this.data.userInfo.nickName || '用户';
-    
+
     wx.showModal({
       title: '修改昵称',
       editable: true,
@@ -204,7 +202,7 @@ Page({
       success: (res) => {
         const userProfile = res.userInfo;
         console.log('获取用户信息成功:', userProfile);
-        
+
         // 调用云函数更新用户信息
         that.updateUserInfo({
           nickName: userProfile.nickName,
@@ -230,7 +228,7 @@ Page({
    */
   updateUserInfo: function(userInfo) {
     const that = this;
-    
+
     wx.cloud.callFunction({
       name: 'updateUserInfo',
       data: {
@@ -239,20 +237,17 @@ Page({
       success: res => {
         wx.hideLoading();
         if (res.result && res.result.success) {
-          console.log('用户信息更新成功:', res.result.user);
-          
           // 更新本地和全局用户信息
           that.setData({
             userInfo: res.result.user
           });
           getApp().globalData.userInfo = res.result.user;
-          
+
           wx.showToast({
             title: '更新成功',
             icon: 'success'
           });
         } else {
-          console.error('更新用户信息失败:', res.result);
           wx.showToast({
             title: res.result?.message || '更新失败',
             icon: 'none'
@@ -261,7 +256,6 @@ Page({
       },
       fail: err => {
         wx.hideLoading();
-        console.error('调用云函数失败:', err);
         wx.showToast({
           title: '网络错误，请稍后重试',
           icon: 'none'

@@ -49,109 +49,7 @@ Page({
     this.fetchFriendRequests();
   },
 
-  /**
-   * 测试好友关系数据 - 用于调试
-   */
-  testFriendship: async function() {
-    wx.showLoading({ title: '测试中...' });
-
-    try {
-      // 首先检查用户信息是否存在
-      const app = getApp();
-      console.log('全局用户信息:', app.globalData.userInfo);
-      console.log('全局OpenID:', app.globalData.openid);
-      
-      // 直接查询好友关系表 - 包含已接受的好友关系
-      const db = wx.cloud.database();
-      const friendRes = await db.collection('friendships')
-        .where({
-          $or: [
-            { userId: app.globalData.openid, status: 'accepted' },
-            { friendId: app.globalData.openid, status: 'accepted' }
-          ]
-        })
-        .get();
-      
-      // 查询好友请求表
-      const requestRes = await db.collection('friendships')
-        .where({
-          friendId: app.globalData.openid,
-          status: 'pending'
-        })
-        .get();
-      
-      console.log('[直接查询] 好友关系结果:', friendRes.data);
-      console.log('[直接查询] 好友请求结果:', requestRes.data);
-      wx.hideLoading();
-      
-      // 显示测试结果弹窗
-      wx.showModal({
-        title: '测试结果',
-        content: `用户OpenID: ${app.globalData.openid || '未获取到'}\n\n用户信息: ${app.globalData.userInfo ? '已存在' : '不存在'}\n\n好友关系数: ${friendRes.data.length}\n\n好友请求数: ${requestRes.data.length}\n\n${friendRes.data.length > 0 ? '好友关系详情:\n' + JSON.stringify(friendRes.data) : ''}`,
-        showCancel: false,
-        confirmText: '刷新列表',
-        success: (res) => {
-          if (res.confirm) {
-            this.fetchFriendList();
-            this.fetchFriendRequests();
-          }
-        }
-      });
-    } catch (err) {
-      console.error('[测试好友关系] 失败:', err);
-      wx.hideLoading();
-      wx.showToast({
-        title: '测试失败: ' + err.message,
-        icon: 'none'
-      });
-    }
-  },
   
-  /**
-   * 手动发送测试好友请求给自己（用于调试）
-   */
-  testSendRequest: function() {
-    const app = getApp();
-    if (!app.globalData.openid) {
-      wx.showToast({ title: '无法获取用户ID', icon: 'none' });
-      return;
-    }
-    
-    wx.showModal({
-      title: '发送测试请求',
-      content: '确定要发送一个测试好友请求给自己吗？（这只是用于调试）',
-      success: res => {
-        if (res.confirm) {
-          wx.showLoading({ title: '发送中...' });
-          
-          wx.cloud.callFunction({
-            name: 'friendRelation',
-            data: {
-              action: 'sendRequest',
-              targetUserId: app.globalData.openid,
-              customMessage: '这是一条测试好友请求'
-            },
-            success: res => {
-              console.log('[测试请求] 结果:', res.result);
-              wx.hideLoading();
-              
-              if (res.result.success) {
-                wx.showToast({ title: '测试请求已发送', icon: 'success' });
-                this.fetchFriendRequests(); // 立即刷新好友请求
-              } else {
-                wx.showToast({ title: res.result.message || '发送失败', icon: 'none' });
-              }
-            },
-            fail: err => {
-              console.error('[测试请求] 失败:', err);
-              wx.hideLoading();
-              wx.showToast({ title: '发送失败', icon: 'none' });
-            }
-          });
-        }
-      }
-    });
-  },
 
   /**
    * 获取好友列表 - 使用getFriends操作
@@ -176,7 +74,6 @@ Page({
         });
       },
       fail: err => {
-        console.error('[云函数] [getFriends] 失败：', err);
         this.setData({ loading: false });
         wx.showToast({
           title: '获取好友列表失败',
@@ -191,8 +88,6 @@ Page({
    */
   fetchFriendRequests: function() {
     const userId = getApp().globalData.userInfo?._id;
-    console.log('[fetchFriendRequests] 当前用户ID:', userId);
-    console.log('[fetchFriendRequests] 当前用户OpenID:', getApp().globalData.openid);
 
     wx.cloud.callFunction({
       name: 'friendRelation',
@@ -200,15 +95,7 @@ Page({
         action: 'getRequests'
       },
       success: res => {
-        console.log('[云函数] [getRequests] 成功：', res.result);
-        console.log('[云函数] [getRequests] 完整返回：', res);
-        console.log('[云函数] [getRequests] 返回状态：', res.result.success);
-        console.log('[云函数] [getRequests] 请求数量：', (res.result.requests || []).length);
-        
-        // 显示更多调试信息
-        if (res.result.debugInfo) {
-          console.log('[云函数] [getRequests] 调试信息：', res.result.debugInfo);
-        }
+
         
         // 使用正确的路径获取好友请求数据，并格式化日期
         const formattedRequests = (res.result.requests || []).map(request => ({
@@ -220,13 +107,8 @@ Page({
           friendRequests: formattedRequests
         });
         
-        // 显示调试信息
-        console.log('[fetchFriendRequests] 格式化后的请求列表：', formattedRequests);
-        
         // 如果请求列表为空，提示用户
         if (formattedRequests.length === 0) {
-          // 显示更详细的调试提示
-          console.log('[fetchFriendRequests] 没有找到好友请求，可能的原因：\n1. 数据库中没有针对当前用户ID/OpenID的待处理请求\n2. 当前用户ID/OpenID：', userId, '/', getApp().globalData.openid);
           wx.showToast({
             title: '当前没有好友请求',
             icon: 'none'
@@ -234,7 +116,7 @@ Page({
         }
       },
       fail: err => {
-        console.error('[云函数] [getRequests] 失败：', err);
+
         wx.showToast({
           title: '获取好友请求失败',
           icon: 'error'
@@ -256,7 +138,6 @@ Page({
    * 输入框内容变化
    */
   onInputChange: function(e) {
-    console.log('输入框内容变化:', e.detail.value);
     this.setData({
       searchUserId: e.detail.value
     });
@@ -266,12 +147,8 @@ Page({
    * 添加好友 - 使用sendRequest操作
    */
   addFriend: function() {
-    console.log('addFriend方法被调用');
-
     const targetUserId = this.data.searchUserId.trim();
     const userId = getApp().globalData.userInfo._id;
-
-    console.log('好友ID:', targetUserId);
 
     if (!targetUserId) {
       wx.showToast({
@@ -300,7 +177,6 @@ Page({
         targetUserId: targetUserId
       },
       success: res => {
-        console.log('[云函数] [sendRequest] 成功：', res.result);
         wx.hideLoading();
 
         if (res.result.success) {
@@ -322,7 +198,6 @@ Page({
         }
       },
       fail: err => {
-        console.error('[云函数] [sendRequest] 失败：', err);
         wx.hideLoading();
         wx.showToast({
           title: '发送请求失败',
@@ -349,7 +224,6 @@ Page({
         requestId: requestId
       },
       success: res => {
-        console.log('[云函数] [acceptRequest] 成功：', res.result);
         wx.hideLoading();
 
         if (res.result.success) {
@@ -369,7 +243,6 @@ Page({
         }
       },
       fail: err => {
-        console.error('[云函数] [acceptRequest] 失败：', err);
         wx.hideLoading();
         wx.showToast({
           title: '处理失败',
@@ -396,7 +269,6 @@ Page({
         requestId: requestId
       },
       success: res => {
-        console.log('[云函数] [rejectRequest] 成功：', res.result);
         wx.hideLoading();
 
         if (res.result.success) {
@@ -415,7 +287,6 @@ Page({
         }
       },
       fail: err => {
-        console.error('[云函数] [rejectRequest] 失败：', err);
         wx.hideLoading();
         wx.showToast({
           title: '处理失败',
@@ -448,7 +319,6 @@ Page({
               targetUserId: friendId
             },
             success: res => {
-              console.log('[云函数] [deleteFriend] 成功：', res.result);
               wx.hideLoading();
 
               if (res.result.success) {
@@ -467,7 +337,6 @@ Page({
               }
             },
             fail: err => {
-              console.error('[云函数] [deleteFriend] 失败：', err);
               wx.hideLoading();
               wx.showToast({
                 title: '删除失败',
@@ -511,7 +380,6 @@ Page({
         });
       },
       fail: err => {
-        console.error('[复制] 失败：', err);
         wx.showToast({
           title: '复制失败，请重试',
           icon: 'none'

@@ -22,7 +22,6 @@ exports.main = async (event, context) => {
 
   // 检查openid是否存在
   if (!openid) {
-    console.error('无法获取用户openid');
     return {
       success: false,
       message: '更新失败：无法获取用户身份信息',
@@ -38,12 +37,6 @@ exports.main = async (event, context) => {
       error: { errCode: -2, errMsg: '缺少用户信息' }
     };
   }
-
-  console.log('接收到的用户更新数据:', {
-    openid: '已获取', // 不打印完整openid以保护用户隐私
-    hasNickName: !!userInfo.nickName,
-    hasAvatarUrl: !!userInfo.avatarUrl
-  });
 
   try {
     // 查找用户是否已存在
@@ -98,7 +91,6 @@ exports.main = async (event, context) => {
           user: updatedUser.data
         };
       } catch (updateError) {
-        console.error('更新用户信息失败:', updateError);
         return {
           success: false,
           message: '更新失败，请稍后重试',
@@ -114,7 +106,6 @@ exports.main = async (event, context) => {
       };
     }
   } catch (error) {
-    console.error('更新用户信息过程中发生错误:', error);
     return {
       success: false,
       message: '服务器繁忙，请稍后重试',

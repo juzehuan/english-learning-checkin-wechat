@@ -18,7 +18,6 @@ Page({
     wx.getUserProfile({
       desc: '用于完善用户资料',
       success: (res) => {
-        console.log("🚀 ~ res:", res)
         wx.showLoading({
           title: '登录中...',
         });
@@ -35,7 +34,6 @@ Page({
             cloudID: res.cloudID
           },
           success: res => {
-            console.log("🚀 ~ res:", res)
             const { openid, user } = res.result;
 
             // 检查是否成功获取openid和用户信息
@@ -45,7 +43,6 @@ Page({
                 title: '登录失败：无法获取完整用户信息',
                 icon: 'none'
               });
-              console.error('[云函数] [login] 未返回完整的用户信息:', res);
               return;
             }
 
@@ -80,7 +77,6 @@ Page({
               icon: 'none',
               duration: 5000 // 延长显示时间，让用户有足够时间阅读错误信息
             });
-            console.error('[云函数] [login] 调用失败：', err);
           }
         });
       },

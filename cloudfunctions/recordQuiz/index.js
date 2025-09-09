@@ -22,14 +22,7 @@ exports.main = async (event, context) => {
     const currentUserOpenid = wxContext.OPENID;
     const { correctCount = 0, wrongCount = 0, role = '提问者', friendId = null } = event;
     
-    // 参数日志记录
-    console.log('[recordQuiz] 接收到的参数:', {
-      currentUserOpenid,
-      correctCount,
-      wrongCount,
-      role,
-      friendId
-    });
+
 
     // 1. 参数验证
     if (correctCount + wrongCount > 10) {
@@ -57,8 +50,6 @@ exports.main = async (event, context) => {
         createTime: db.serverDate()
       }
     });
-    
-    console.log('[recordQuiz] 抽背记录保存成功，ID:', quizRecord._id);
 
     // 3. 计算积分变化
     let scoreChange = 0;
@@ -98,7 +89,6 @@ exports.main = async (event, context) => {
       newScore: newScore
     };
   } catch (error) {
-    console.error('[recordQuiz] 错误:', error);
     return {
       success: false,
       message: '记录失败：' + (error.message || '未知错误'),
@@ -133,8 +123,6 @@ async function updateUserScore(openid, scoreChange) {
           updateTime: db.serverDate()
         }
       });
-      
-      console.log('[recordQuiz] 更新用户积分成功:', openid, newScore);
     } else {
       // 用户不存在，创建用户
       newScore = Math.max(0, scoreChange);
@@ -147,13 +135,10 @@ async function updateUserScore(openid, scoreChange) {
           updateTime: db.serverDate()
         }
       });
-      
-      console.log('[recordQuiz] 创建新用户并设置积分成功:', openid, newScore);
     }
     
     return newScore;
   } catch (error) {
-    console.error('[recordQuiz] 更新积分失败:', error);
     throw new Error('更新积分失败');
   }
 }
@@ -183,13 +168,9 @@ async function ensureFriendshipExists(currentUserOpenid, friendOpenid) {
           acceptTime: db.serverDate()
         }
       });
-      
-      console.log('[recordQuiz] 好友关系创建成功:', currentUserOpenid, friendOpenid);
     } else {
-      console.log('[recordQuiz] 好友关系已存在:', currentUserOpenid, friendOpenid);
     }
   } catch (error) {
-    console.error('[recordQuiz] 处理好友关系失败:', error);
-    // 不抛出错误，确保主流程继续执行
-  }
+      // 不抛出错误，确保主流程继续执行
+    }
 };

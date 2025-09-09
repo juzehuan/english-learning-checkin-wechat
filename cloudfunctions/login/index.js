@@ -22,22 +22,12 @@ exports.main = async (event, context) => {
 
   // 检查openid是否存在
   if (!openid) {
-    console.error('无法获取用户openid');
     return {
       success: false,
       message: '登录失败：无法获取用户身份信息',
       error: { errCode: -1, errMsg: '无法获取用户openid' }
     };
   }
-
-  console.log('接收到的用户认证数据:', {
-    openid: '已获取', // 不打印完整openid以保护用户隐私
-    userInfo,
-    hasEncryptedData: !!encryptedData,
-    hasIv: !!iv,
-    hasSignature: !!signature,
-    hasCloudID: !!cloudID
-  });
 
   try {
     // 查找用户是否已存在
@@ -112,26 +102,20 @@ exports.main = async (event, context) => {
         updateTime: db.serverDate()
       };
 
-      console.log('准备创建新用户:', newUser);
-      
       try {
-        const addResult = await db.collection('users').add({
-          data: newUser
-        });
-        
-        console.log('用户创建成功，结果:', addResult);
+          const addResult = await db.collection('users').add({
+            data: newUser
+          });
 
-        // 查询刚创建的用户信息
-        const createdUser = await db.collection('users').doc(addResult._id).get();
-        console.log('查询到的新创建用户:', createdUser.data);
+          // 查询刚创建的用户信息
+          const createdUser = await db.collection('users').doc(addResult._id).get();
 
-        return {
-          success: true,
-          openid: openid,
-          user: createdUser.data
-        };
-      } catch (dbError) {
-        console.error('用户创建或查询失败:', dbError);
+          return {
+            success: true,
+            openid: openid,
+            user: createdUser.data
+          };
+        } catch (dbError) {
         
         // 检查是否是集合不存在的错误
         if (dbError.errCode === -502005) {
@@ -160,8 +144,6 @@ exports.main = async (event, context) => {
       }
     }
   } catch (error) {
-    console.error('[云函数] [login] 错误：', error);
-    
     // 检查是否是集合不存在的错误
     if (error.errCode === -502005) {
       return {
