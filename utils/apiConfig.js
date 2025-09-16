@@ -1,6 +1,6 @@
 // API配置文件
 // 后端服务基础URL
-const BASE_URL = 'https://express-289r-187125-9-1305632701.sh.run.tcloudbase.com:3000/api';
+const BASE_URL = 'https://express-289r-187125-9-1305632701.sh.run.tcloudbase.com/api';
 
 // API接口路径配置
 export const API = {
