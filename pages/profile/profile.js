@@ -1,7 +1,11 @@
 // 个人信息页面逻辑
 // 导入API配置
 const { api, API } = require('../../utils/apiConfig');
-
+// 初始化云开发
+const cloud = wx.cloud;
+cloud.init({
+  env: 'prod-0g4esjft4f388f06'
+});
 Page({
   data: {
     userInfo: {},
@@ -17,8 +21,16 @@ Page({
   },
 
   onLoad: function() {
+    // 确保从全局数据初始化时也能正确处理字段映射
+    const globalUserInfo = getApp().globalData.userInfo || {};
+    const userInfoWithCorrectMapping = {
+      ...globalUserInfo,
+      nickName: globalUserInfo.nickname || globalUserInfo.nickName,
+      _id: globalUserInfo._id || globalUserInfo.id
+    };
+
     this.setData({
-      userInfo: getApp().globalData.userInfo
+      userInfo: userInfoWithCorrectMapping
     });
     this.fetchUserDetail();
   },
@@ -58,8 +70,15 @@ Page({
           }
         });
 
+        // 确保nickname字段正确映射到前端期望的nickName
+        const updatedUserData = {
+          ...userData,
+          nickName: userData.nickname || userData.nickName,
+          _id: userData._id || userData.id
+        };
+
         // 更新全局用户信息
-        getApp().globalData.userInfo = userData;
+        getApp().globalData.userInfo = updatedUserData;
       } else {
         wx.showToast({
           title: res.message || '获取数据失败',
@@ -147,36 +166,23 @@ Page({
       title: '上传中...',
     });
 
-    // 调用后端API上传头像
-    const uploadTask = wx.uploadFile({
-      url: `${getApp().globalData.backendUrl}${API.USER.UPLOAD_AVATAR}`,
-      filePath: avatarFilePath,
-      name: 'avatar',
-      formData: {
-        openid: getApp().globalData.userInfo.openid
+    // 生成唯一的文件名
+    const timestamp = new Date().getTime();
+    const cloudPath = `avatar/${getApp().globalData.userInfo.openid}_${timestamp}.jpg`;
+
+    // 使用云开发上传文件到对象存储
+    wx.cloud.uploadFile({
+      cloudPath: cloudPath, // 对象存储路径，根路径直接填文件名，文件夹例子 test/文件名，不要 / 开头
+      filePath: avatarFilePath, // 微信本地文件，通过选择图片，聊天文件等接口获取
+      config: {
+        env: 'prod-0g4esjft4f388f06' // 微信云托管环境ID
       },
       success: res => {
-        try {
-          const response = JSON.parse(res.data);
-          if (response.success) {
-            // 调用云函数更新用户信息
-            that.updateUserInfo({
-              avatarUrl: response.avatarUrl
-            });
-          } else {
-            wx.hideLoading();
-            wx.showToast({
-              title: response.message || '上传头像失败',
-              icon: 'none'
-            });
-          }
-        } catch (e) {
-          wx.hideLoading();
-          wx.showToast({
-            title: '上传头像失败',
-            icon: 'none'
-          });
-        }
+        console.log('头像上传成功:', res);
+        // 调用云函数更新用户信息
+        that.updateUserInfo({
+          avatarUrl: res.fileID
+        });
       },
       fail: err => {
         console.error('头像上传失败:', err);
@@ -260,7 +266,7 @@ Page({
   updateUserInfo: function(userInfo) {
     const that = this;
     const app = getApp();
-    
+
     if (!app.globalData.userInfo || !app.globalData.userInfo.openid) {
       wx.hideLoading();
       wx.showToast({
@@ -277,10 +283,17 @@ Page({
       wx.hideLoading();
       if (res.success) {
         // 更新本地和全局用户信息
+        // 确保nickname字段正确映射到前端期望的nickName
+        const updatedUserInfo = {
+          ...res.user,
+          nickName: res.user.nickname || res.user.nickName,
+          _id: res.user._id || res.user.id
+        };
+
         that.setData({
-          userInfo: res.user
+          userInfo: updatedUserInfo
         });
-        getApp().globalData.userInfo = res.user;
+        getApp().globalData.userInfo = updatedUserInfo;
 
         wx.showToast({
           title: '更新成功',

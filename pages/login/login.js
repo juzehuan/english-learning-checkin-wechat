@@ -23,57 +23,105 @@ Page({
           title: '登录中...',
         });
 
-        // 调用后端API进行登录，传递用户信息数据
+        // 1. 获取用户基本信息
         const userInfo = res.userInfo;
-        
-        // 发送微信openid和用户信息到后端
-        // 注意：在实际环境中，这里应该先通过微信登录获取openid，然后再发送到后端
-        // 简化处理，假设userInfo中包含openid
-        api.post(API.USER.CREATE_OR_UPDATE, {
-          openid: 'temp_openid_' + Date.now(), // 临时模拟openid，实际环境需要从wx.login获取
-          nickname: userInfo.nickName,
-          avatarUrl: userInfo.avatarUrl,
-          totalPoints: 0,
-          consecutiveDays: 0,
-          skipCards: 0,
-          skipQuizCards: 0
-        }).then(result => {
-          if (result.success && result.user) {
-            // 保存用户信息到本地
-            wx.setStorage({
-              key: 'userInfo',
-              data: result.user,
-              success: () => {
-                // 更新全局用户信息
-                getApp().globalData.userInfo = result.user;
-                getApp().globalData.isLoggedIn = true;
+
+        // 2. 调用微信登录获取code，用于交换openid
+        wx.login({
+          success: (loginRes) => {
+            if (loginRes.code) {
+              // 3. 发送code到后端，由后端向微信服务器换取openid
+              api.post(API.USER.WX_LOGIN, {
+                code: loginRes.code,
+                userInfo: userInfo
+              }).then(loginResult => {
+                if (loginResult.success && loginResult.openid) {
+                  // 4. 先尝试通过openid查询用户是否已存在
+                  api.get(API.USER.GET_BY_OPENID + loginResult.openid)
+                    .then(userResult => {
+                      if (userResult.success && userResult.user) {
+                        // 用户已存在，直接使用现有用户信息
+                        return Promise.resolve({ success: true, user: userResult.user });
+                      } else {
+                        // 用户不存在，创建新用户
+                        return api.post(API.USER.CREATE_OR_UPDATE, {
+                          openid: loginResult.openid,
+                          nickname: userInfo.nickName,
+                          avatarUrl: userInfo.avatarUrl,
+                          totalPoints: 0,
+                          consecutiveDays: 0,
+                          skipCards: 0,
+                          skipQuizCards: 0
+                        });
+                      }
+                    }).then(result => {
+                    if (result.success && result.user) {
+                      // 保存用户信息到本地
+                      wx.setStorage({
+                        key: 'userInfo',
+                        data: result.user,
+                        success: () => {
+                          // 更新全局用户信息
+                          getApp().globalData.userInfo = result.user;
+                          getApp().globalData.isLoggedIn = true;
+                          wx.hideLoading();
+                          wx.switchTab({
+                            url: '/pages/index/index'
+                          });
+                        }
+                      });
+                    } else {
+                      wx.hideLoading();
+                      wx.showToast({
+                        title: result.message || '登录失败',
+                        icon: 'none'
+                      });
+                    }
+                  }).catch(err => {
+                    wx.hideLoading();
+
+                    // 显示具体的错误信息
+                    let errorMessage = '登录失败，请重试';
+                    if (err && err.message) {
+                      errorMessage = err.message;
+                    }
+
+                    wx.showToast({
+                      title: errorMessage,
+                      icon: 'none',
+                      duration: 5000 // 延长显示时间，让用户有足够时间阅读错误信息
+                    });
+                  });
+                } else {
+                  wx.hideLoading();
+                  wx.showToast({
+                    title: loginResult.message || '获取openid失败',
+                    icon: 'none'
+                  });
+                }
+              }).catch(err => {
+                console.log("🚀 ~ err:", err)
                 wx.hideLoading();
-                wx.switchTab({
-                  url: '/pages/index/index'
+                wx.showToast({
+                  title: '微信登录失败，请重试',
+                  icon: 'none'
                 });
-              }
-            });
-          } else {
+              });
+            } else {
+              wx.hideLoading();
+              wx.showToast({
+                title: '获取登录code失败',
+                icon: 'none'
+              });
+            }
+          },
+          fail: () => {
             wx.hideLoading();
             wx.showToast({
-              title: result.message || '登录失败',
+              title: '微信登录失败，请重试',
               icon: 'none'
             });
           }
-        }).catch(err => {
-          wx.hideLoading();
-          
-          // 显示具体的错误信息
-          let errorMessage = '登录失败，请重试';
-          if (err && err.message) {
-            errorMessage = err.message;
-          }
-
-          wx.showToast({
-            title: errorMessage,
-            icon: 'none',
-            duration: 5000 // 延长显示时间，让用户有足够时间阅读错误信息
-          });
         });
       },
       fail: () => {

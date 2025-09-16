@@ -1,6 +1,8 @@
 // API配置文件
 // 后端服务基础URL
-const BASE_URL = 'http://localhost:3000/api';
+// 注意：在微信小程序开发中，不能直接使用localhost，需要使用实际IP地址
+// 请将下面的IP地址替换为您本地电脑的实际IP地址
+const BASE_URL = 'http://10.1.10.151:3000/api';
 
 // API接口路径配置
 const API = {
@@ -10,22 +12,23 @@ const API = {
     GET_BY_OPENID: `${BASE_URL}/users/`, // 需拼接openid
     UPDATE_POINTS: `${BASE_URL}/users/`, // 需拼接id/points
     UPDATE: `${BASE_URL}/users/update`,
-    UPLOAD_AVATAR: `${BASE_URL}/users/uploadAvatar`
+    UPLOAD_AVATAR: `${BASE_URL}/users/uploadAvatar`,
+    WX_LOGIN: `${BASE_URL}/users/wxlogin`
   },
 
   // 打卡接口
   SIGNIN: {
     DAILY_SIGNIN: `${BASE_URL}/signin`,
     GET_HISTORY: `${BASE_URL}/signin/`, // 需拼接openid/history
-    USE_SKIP_CARD: `${BASE_URL}/signin/skip`
+    USE_SKIP_CARD: `${BASE_URL}/signin/skip`,
+    GET_STATS: `${BASE_URL}/signin/` // 需拼接openid/stats
   },
 
   // 抽背记录接口
   QUIZ: {
-    RECORD_RESULT: `${BASE_URL}/quiz`,
+    RECORD_RESULT: `${BASE_URL}/quiz`, // 同时作为CREATE_RECORD使用
     USE_SKIP_QUIZ: `${BASE_URL}/quiz/skip`,
-    GET_HISTORY: `${BASE_URL}/quiz/`, // 需拼接openid/history
-    CREATE_RECORD: `${BASE_URL}/quiz/create`
+    GET_HISTORY: `${BASE_URL}/quiz/` // 需拼接openid/history
   },
 
   // 好友关系接口
@@ -34,11 +37,9 @@ const API = {
     ACCEPT_REQUEST: `${BASE_URL}/friend/acceptRequest`,
     REJECT_REQUEST: `${BASE_URL}/friend/rejectRequest`,
     DELETE_FRIEND: `${BASE_URL}/friend/deleteFriend`,
-    GET_FRIENDS: `${BASE_URL}/friend/getFriends/`, // 需拼接openid
-    GET_REQUESTS: `${BASE_URL}/friend/getRequests/`, // 需拼接openid
-    CHECK_RELATION: `${BASE_URL}/friend/checkRelation/`, // 需拼接openid/targetUserId
-    GET_FRIEND_LIST: `${BASE_URL}/friend/getFriendList`,
-    GET_FRIEND_REQUESTS: `${BASE_URL}/friend/getFriendRequests`
+    GET_FRIENDS: `${BASE_URL}/friend/getFriends/`, // 需拼接openid或使用查询参数
+    GET_REQUESTS: `${BASE_URL}/friend/getRequests/`, // 需拼接openid或使用查询参数
+    CHECK_RELATION: `${BASE_URL}/friend/checkRelation/` // 需拼接openid/targetUserId
   },
 
   // 统计接口
@@ -68,25 +69,41 @@ function request(method, url, data = {}, showLoading = true) {
           wx.hideLoading();
         }
 
-        if (res.statusCode === 200) {
-          resolve(res.data);
+        // 根据HTTP状态码处理响应
+        const responseData = res.data;
+
+        // 检查是否是统一响应格式 (包含code、message、data字段)
+        if (responseData && 'code' in responseData && 'message' in responseData && 'data' in responseData) {
+          // 转换为前端代码期望的格式
+          const formattedResponse = {};
+
+          // 200系列状态码且code=0表示成功
+          formattedResponse.success = (res.statusCode >= 200 && res.statusCode < 300) && responseData.code === 0;
+
+          // 保持message字段
+          formattedResponse.message = responseData.message;
+
+          // 将data中的所有内容展开到顶层
+          if (responseData.data !== null && typeof responseData.data === 'object') {
+            Object.assign(formattedResponse, responseData.data);
+          }
+
+          // 传递原始code和statusCode，便于高级处理
+          formattedResponse.code = responseData.code;
+          formattedResponse.statusCode = res.statusCode;
+
+          resolve(formattedResponse);
         } else {
-          reject(new Error(`请求失败，状态码: ${res.statusCode}`));
-          wx.showToast({
-            title: res.data?.message || '请求失败',
-            icon: 'none'
-          });
+          // 对于非统一格式的响应，保持原有逻辑
+          resolve(responseData);
         }
       },
       fail: (err) => {
         if (showLoading) {
           wx.hideLoading();
         }
+        // 只reject Promise，不直接显示Toast，让调用方自己决定如何处理错误
         reject(err);
-        wx.showToast({
-          title: '网络错误，请稍后重试',
-          icon: 'none'
-        });
       }
     });
   });

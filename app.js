@@ -19,8 +19,7 @@ App({
       success: function(res) {
         that.globalData.userInfo = res.data;
         that.globalData.isLoggedIn = true;
-        // 登录成功后，刷新用户信息
-        that.refreshUserInfo();
+        // 不再自动刷新用户信息，避免每次登录都更新
       },
       fail: function() {
         // 用户未登录，跳转到登录页面
