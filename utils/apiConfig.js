@@ -1,9 +1,9 @@
 // API配置文件
 // 后端服务基础URL
-const BASE_URL = 'https://express-289r-187125-9-1305632701.sh.run.tcloudbase.com/api';
+const BASE_URL = 'http://localhost:3000/api';
 
 // API接口路径配置
-export const API = {
+const API = {
   // 用户接口
   USER: {
     CREATE_OR_UPDATE: `${BASE_URL}/users`,
@@ -48,7 +48,7 @@ export const API = {
 };
 
 // 封装wx.request方法
-export function request(method, url, data = {}, showLoading = true) {
+function request(method, url, data = {}, showLoading = true) {
   return new Promise((resolve, reject) => {
     if (showLoading) {
       wx.showLoading({
@@ -93,9 +93,16 @@ export function request(method, url, data = {}, showLoading = true) {
 }
 
 // 快捷方法
-export const api = {
+const api = {
   get: (url, data = {}, showLoading = true) => request('GET', url, data, showLoading),
   post: (url, data = {}, showLoading = true) => request('POST', url, data, showLoading),
   put: (url, data = {}, showLoading = true) => request('PUT', url, data, showLoading),
   delete: (url, data = {}, showLoading = true) => request('DELETE', url, data, showLoading)
+};
+
+// 使用CommonJS导出方式，适配微信小程序
+module.exports = {
+  API,
+  api,
+  request
 };

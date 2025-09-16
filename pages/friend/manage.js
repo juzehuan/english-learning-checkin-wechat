@@ -1,4 +1,3 @@
-/**
 // 导入API配置
 const { api, API } = require('../../utils/apiConfig');
 
