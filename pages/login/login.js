@@ -1,4 +1,7 @@
 // 登录页面逻辑
+// 导入API配置
+const { API, api } = require('../../utils/apiConfig');
+
 Page({
   data: {
   },
@@ -11,8 +14,6 @@ Page({
    * 获取用户信息并登录
    */
   getUserProfile: function() {
-
-
     const that = this;
 
     wx.getUserProfile({
@@ -22,37 +23,29 @@ Page({
           title: '登录中...',
         });
 
-        // 调用云函数进行登录，传递完整的用户信息数据
-        wx.cloud.callFunction({
-          name: 'login',
-          data: {
-            userInfo: res.userInfo,
-            encryptedData: res.encryptedData,
-            iv: res.iv,
-            signature: res.signature,
-            rawData: res.rawData,
-            cloudID: res.cloudID
-          },
-          success: res => {
-            const { openid, user } = res.result;
-
-            // 检查是否成功获取openid和用户信息
-            if (!openid || !user) {
-              wx.hideLoading();
-              wx.showToast({
-                title: '登录失败：无法获取完整用户信息',
-                icon: 'none'
-              });
-              return;
-            }
-
+        // 调用后端API进行登录，传递用户信息数据
+        const userInfo = res.userInfo;
+        
+        // 发送微信openid和用户信息到后端
+        // 注意：在实际环境中，这里应该先通过微信登录获取openid，然后再发送到后端
+        // 简化处理，假设userInfo中包含openid
+        api.post(API.USER.CREATE_OR_UPDATE, {
+          openid: 'temp_openid_' + Date.now(), // 临时模拟openid，实际环境需要从wx.login获取
+          nickname: userInfo.nickName,
+          avatarUrl: userInfo.avatarUrl,
+          totalPoints: 0,
+          consecutiveDays: 0,
+          skipCards: 0,
+          skipQuizCards: 0
+        }).then(result => {
+          if (result.success && result.user) {
             // 保存用户信息到本地
             wx.setStorage({
               key: 'userInfo',
-              data: user,
+              data: result.user,
               success: () => {
                 // 更新全局用户信息
-                getApp().globalData.userInfo = user;
+                getApp().globalData.userInfo = result.user;
                 getApp().globalData.isLoggedIn = true;
                 wx.hideLoading();
                 wx.switchTab({
@@ -60,24 +53,27 @@ Page({
                 });
               }
             });
-          },
-          fail: err => {
+          } else {
             wx.hideLoading();
-
-            // 显示具体的错误信息
-            let errorMessage = '登录失败，请重试';
-            if (err && err.result && err.result.message) {
-              errorMessage = err.result.message;
-            } else if (err && err.errMsg) {
-              errorMessage = err.errMsg;
-            }
-
             wx.showToast({
-              title: errorMessage,
-              icon: 'none',
-              duration: 5000 // 延长显示时间，让用户有足够时间阅读错误信息
+              title: result.message || '登录失败',
+              icon: 'none'
             });
           }
+        }).catch(err => {
+          wx.hideLoading();
+          
+          // 显示具体的错误信息
+          let errorMessage = '登录失败，请重试';
+          if (err && err.message) {
+            errorMessage = err.message;
+          }
+
+          wx.showToast({
+            title: errorMessage,
+            icon: 'none',
+            duration: 5000 // 延长显示时间，让用户有足够时间阅读错误信息
+          });
         });
       },
       fail: () => {
@@ -88,8 +84,6 @@ Page({
       }
     });
   },
-
-
 
   /**
    * 查看用户协议

@@ -1,4 +1,7 @@
 // 打卡页面逻辑
+// 导入API配置
+const { API, api } = require('../../utils/apiConfig');
+
 Page({
   data: {
     isSigned: false,
@@ -28,33 +31,26 @@ Page({
   checkTodaySignin: function() {
     // 检查用户是否登录
     const app = getApp();
-    if (!app.globalData.userInfo) {
+    if (!app.globalData.userInfo || !app.globalData.userInfo.openid) {
       this.handleNotLoggedIn();
       return;
     }
 
-    const db = wx.cloud.database();
-    const _ = db.command;
-    const userId = app.globalData.userInfo._id;
-    const today = new Date(this.data.todayDate);
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    db.collection('signins').where({
-      userId: userId,
-      date: _.gte(today).and(_.lt(tomorrow))
-    }).get({
-      success: res => {
-        if (res.data && res.data.length > 0) {
+    // 调用后端API检查今日是否已打卡
+    const userId = app.globalData.userInfo.openid;
+    const today = this.data.todayDate;
+    
+    api.get(API.SIGNIN.GET_HISTORY + userId + '/history?date=' + today)
+      .then(res => {
+        if (res.success && res.signinRecords && res.signinRecords.length > 0) {
           this.setData({
             isSigned: true
           });
         }
-      },
-      fail: err => {
-      }
-    });
+      })
+      .catch(err => {
+        console.error('检查打卡状态失败:', err);
+      });
   },
 
   /**
@@ -63,23 +59,25 @@ Page({
   fetchUserProgress: function() {
     // 检查用户是否登录
     const app = getApp();
-    if (!app.globalData.userInfo) {
+    if (!app.globalData.userInfo || !app.globalData.userInfo.openid) {
       this.handleNotLoggedIn();
       return;
     }
 
-    const db = wx.cloud.database();
-    db.collection('users').doc(app.globalData.userInfo._id).get({
-      success: res => {
-        this.setData({
-          consecutiveDays: res.data.progress?.consecutiveDays || 0,
-          skipCardCount: res.data.skipCardCount || 0,
-          canUseSkipCard: (res.data.skipCardCount || 0) > 0
-        });
-      },
-      fail: err => {
-      }
-    });
+    // 调用后端API获取用户信息
+    api.get(API.USER.GET_BY_OPENID + app.globalData.userInfo.openid)
+      .then(res => {
+        if (res.success && res.user) {
+          this.setData({
+            consecutiveDays: res.user.consecutiveDays || 0,
+            skipCardCount: res.user.skipCards || 0,
+            canUseSkipCard: (res.user.skipCards || 0) > 0
+          });
+        }
+      })
+      .catch(err => {
+        console.error('获取用户进度失败:', err);
+      });
   },
 
   /**
@@ -99,6 +97,63 @@ Page({
   },
 
   /**
+   * 使用免打卡特权
+   */
+  useSkipCard: function() {
+    const app = getApp();
+    if (!app.globalData.userInfo || !app.globalData.userInfo.openid) {
+      this.handleNotLoggedIn();
+      return;
+    }
+    
+    if (!this.data.canUseSkipCard) {
+      wx.showToast({
+        title: '您没有免打卡卡',
+        icon: 'none'
+      });
+      return;
+    }
+    
+    wx.showLoading({
+      title: '使用免打卡卡...',
+    });
+    
+    api.post(API.SIGNIN.USE_SKIP_CARD, {
+      openid: app.globalData.userInfo.openid
+    }).then(res => {
+      wx.hideLoading();
+      
+      if (res.success) {
+        // 使用成功
+        this.setData({
+          isSigned: true,
+          skipCardCount: res.user.skipCards || 0,
+          canUseSkipCard: (res.user.skipCards || 0) > 0
+        });
+        
+        // 更新全局用户信息
+        getApp().globalData.userInfo = res.user;
+        
+        wx.showToast({
+          title: res.message || '已成功使用免打卡卡',
+          icon: 'success'
+        });
+      } else {
+        wx.showToast({
+          title: res.message || '使用失败',
+          icon: 'none'
+        });
+      }
+    }).catch(err => {
+      wx.hideLoading();
+      wx.showToast({
+        title: '网络错误，请稍后重试',
+        icon: 'none'
+      });
+    });
+  },
+  
+  /**
    * 执行打卡操作
    */
   doSignin: function() {
@@ -112,7 +167,7 @@ Page({
 
     // 检查用户是否登录
     const app = getApp();
-    if (!app.globalData.userInfo) {
+    if (!app.globalData.userInfo || !app.globalData.userInfo.openid) {
       this.handleNotLoggedIn();
       return;
     }
@@ -121,44 +176,38 @@ Page({
       title: '打卡中...',
     });
 
-    const db = wx.cloud.database();
-    const userId = app.globalData.userInfo._id;
-
-    // 调用云函数进行打卡
-    wx.cloud.callFunction({
-      name: 'doSignin',
-      data: {
-        userId: userId,
-        date: new Date()
-      },
-      success: res => {
-        wx.hideLoading();
-        if (res.result.success) {
-          this.setData({
-            isSigned: true,
-            consecutiveDays: res.result.consecutiveDays
-          });
-          wx.showToast({
-            title: '打卡成功！+1分',
-            icon: 'success'
-          });
-          // 更新全局用户信息
-          getApp().globalData.userInfo.score = res.result.newScore;
-          getApp().globalData.userInfo.progress = res.result.progress;
-        } else {
-          wx.showToast({
-            title: res.result.message || '打卡失败',
-            icon: 'none'
-          });
-        }
-      },
-      fail: err => {
-        wx.hideLoading();
+    // 调用后端API进行打卡
+    api.post(API.SIGNIN.DAILY_SIGNIN, {
+      openid: app.globalData.userInfo.openid
+    }).then(res => {
+      wx.hideLoading();
+      
+      if (res.success) {
+        // 打卡成功
+        this.setData({
+          isSigned: true,
+          consecutiveDays: res.signinRecord.consecutiveDays || 0
+        });
+        
+        // 更新全局用户信息
+        getApp().globalData.userInfo = res.user;
+        
         wx.showToast({
-          title: '打卡失败',
+          title: res.message || '打卡成功！',
+          icon: 'success'
+        });
+      } else {
+        wx.showToast({
+          title: res.message || '打卡失败',
           icon: 'none'
         });
       }
+    }).catch(err => {
+      wx.hideLoading();
+      wx.showToast({
+        title: '网络错误，请稍后重试',
+        icon: 'none'
+      });
     });
   },
 
@@ -191,7 +240,7 @@ Page({
   processSkipCard: function() {
     // 检查用户是否登录
     const app = getApp();
-    if (!app.globalData.userInfo) {
+    if (!app.globalData.userInfo || !app.globalData.userInfo.openid) {
       this.handleNotLoggedIn();
       return;
     }
@@ -200,42 +249,39 @@ Page({
       title: '处理中...',
     });
 
-    const db = wx.cloud.database();
-    const userId = app.globalData.userInfo._id;
-
-    wx.cloud.callFunction({
-      name: 'useSkipCard',
-      data: {
-        userId: userId
-      },
-      success: res => {
-        wx.hideLoading();
-        if (res.result.success) {
-          this.setData({
-            isSigned: true,
-            skipCardCount: res.result.skipCardCount,
-            canUseSkipCard: res.result.skipCardCount > 0
-          });
-          wx.showToast({
-            title: '免打卡特权使用成功',
-            icon: 'success'
-          });
-          // 更新全局用户信息
-          getApp().globalData.userInfo.skipCardCount = res.result.skipCardCount;
-        } else {
-          wx.showToast({
-            title: res.result.message || '操作失败',
-            icon: 'none'
-          });
-        }
-      },
-      fail: err => {
-        wx.hideLoading();
+    // 调用后端API使用免打卡特权
+    api.post(API.SIGNIN.USE_SKIP_CARD, {
+      openid: app.globalData.userInfo.openid
+    }).then(res => {
+      wx.hideLoading();
+      
+      if (res.success) {
+        // 使用成功
+        this.setData({
+          isSigned: true,
+          skipCardCount: res.user.skipCards || 0,
+          canUseSkipCard: (res.user.skipCards || 0) > 0
+        });
+        
+        // 更新全局用户信息
+        getApp().globalData.userInfo = res.user;
+        
         wx.showToast({
-          title: '操作失败',
+          title: res.message || '已成功使用免打卡特权',
+          icon: 'success'
+        });
+      } else {
+        wx.showToast({
+          title: res.message || '操作失败',
           icon: 'none'
         });
       }
+    }).catch(err => {
+      wx.hideLoading();
+      wx.showToast({
+        title: '网络错误，请稍后重试',
+        icon: 'none'
+      });
     });
   }
 });

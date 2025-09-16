@@ -1,4 +1,7 @@
 // 抽背记录页面逻辑
+// 导入API配置
+const { api, API } = require('../../utils/apiConfig');
+
 Page({
   data: {
     correctCount: 0,
@@ -23,36 +26,39 @@ Page({
       title: '加载好友列表...',
     });
     
-    wx.cloud.callFunction({
-      name: 'friendRelation',
-      data: {
-        action: 'getFriends'
-      },
-      success: res => {
-        wx.hideLoading();
-        if (res.result && res.result.success) {
-          const friends = res.result.friends || [];
-          this.setData({
-            friendList: friends
-          });
-          // 更新全局好友列表
-          getApp().globalData.friendList = friends;
-        } else {
-
-          wx.showToast({
-            title: '获取好友列表失败',
-            icon: 'none'
-          });
-        }
-      },
-      fail: err => {
-        wx.hideLoading();
-        
+    const app = getApp();
+    if (!app.globalData.userInfo || !app.globalData.userInfo.openid) {
+      wx.hideLoading();
+      wx.showToast({
+        title: '请先登录',
+        icon: 'none'
+      });
+      return;
+    }
+    
+    api.get(API.FRIEND.GET_FRIENDS, {
+      openid: app.globalData.userInfo.openid
+    }).then(res => {
+      wx.hideLoading();
+      if (res.success) {
+        const friends = res.friends || [];
+        this.setData({
+          friendList: friends
+        });
+        // 更新全局好友列表
+        getApp().globalData.friendList = friends;
+      } else {
         wx.showToast({
-          title: '网络错误，请稍后重试',
+          title: res.message || '获取好友列表失败',
           icon: 'none'
         });
       }
+    }).catch(err => {
+      wx.hideLoading();
+      wx.showToast({
+        title: '网络错误，请稍后重试',
+        icon: 'none'
+      });
     });
   },
 
@@ -61,20 +67,21 @@ Page({
    */
   fetchUserPrivileges: function() {
     const app = getApp();
-    if (!app.globalData.userInfo || !app.globalData.userInfo._id) {
+    if (!app.globalData.userInfo || !app.globalData.userInfo.openid) {
       return;
     }
     
-    const db = wx.cloud.database();
-    db.collection('users').doc(app.globalData.userInfo._id).get({
-      success: res => {
+    api.get(API.USER.GET_BY_OPENID, {
+      openid: app.globalData.userInfo.openid
+    }).then(res => {
+      if (res.success) {
         this.setData({
-          skipQuizCount: res.data.skipQuizCount || 0,
-          canUseSkipQuiz: (res.data.skipQuizCount || 0) > 0
+          skipQuizCount: res.user.skipQuizzes || 0,
+          canUseSkipQuiz: (res.user.skipQuizzes || 0) > 0
         });
-      },
-      fail: err => {
       }
+    }).catch(err => {
+      console.error('获取用户特权信息失败:', err);
     });
   },
 
@@ -143,8 +150,6 @@ Page({
   submitQuiz: function() {
     const { correctCount, wrongCount, selectedFriendId, selectedFriendName } = this.data;
     
-
-    
     // 输入验证
     if (!selectedFriendId) {
       wx.showToast({
@@ -170,48 +175,52 @@ Page({
       return;
     }
 
+    const app = getApp();
+    if (!app.globalData.userInfo || !app.globalData.userInfo.openid) {
+      wx.showToast({
+        title: '请先登录',
+        icon: 'none'
+      });
+      return;
+    }
+
     wx.showLoading({
       title: '提交中...',
     });
 
-    // 调用云函数记录抽背结果
-    wx.cloud.callFunction({
-      name: 'recordQuiz',
-      data: {
-        correctCount: correctCount,
-        wrongCount: wrongCount,
-        friendId: selectedFriendId,
-        role: '提问者'
-      },
-      success: res => {
-        wx.hideLoading();
-        
-        if (res.result && res.result.success) {
-          wx.showToast({
-            title: '记录成功！',
-            icon: 'success'
-          });
-          // 重置表单并返回
-          setTimeout(() => {
-            wx.navigateBack();
-          }, 1500);
-        } else {
-
-          wx.showToast({
-            title: res.result?.message || '提交失败',
-            icon: 'none',
-            duration: 3000
-          });
-        }
-      },
-      fail: err => {
-        wx.hideLoading();
-
+    // 调用后端API记录抽背结果
+    api.post(API.QUIZ.CREATE_RECORD, {
+      openid: app.globalData.userInfo.openid,
+      correctCount: correctCount,
+      wrongCount: wrongCount,
+      friendId: selectedFriendId,
+      friendName: selectedFriendName,
+      role: '提问者'
+    }).then(res => {
+      wx.hideLoading();
+      
+      if (res.success) {
         wx.showToast({
-          title: '网络错误，请稍后重试',
-          icon: 'none'
+          title: '记录成功！',
+          icon: 'success'
+        });
+        // 重置表单并返回
+        setTimeout(() => {
+          wx.navigateBack();
+        }, 1500);
+      } else {
+        wx.showToast({
+          title: res.message || '提交失败',
+          icon: 'none',
+          duration: 3000
         });
       }
+    }).catch(err => {
+      wx.hideLoading();
+      wx.showToast({
+        title: '网络错误，请稍后重试',
+        icon: 'none'
+      });
     });
   },
 
@@ -255,44 +264,50 @@ Page({
       title: '处理中...',
     });
     
-    // 调用使用免抽背特权的云函数
-    wx.cloud.callFunction({
-      name: 'useSkipQuiz',
-      data: {},
-      success: result => {
-        wx.hideLoading();
-        
-        if (result.result && result.result.success) {
-          wx.showToast({
-            title: '使用成功',
-            icon: 'success'
-          });
-          // 更新特权数量
-          this.setData({
-            skipQuizCount: result.result.skipQuizCount,
-            canUseSkipQuiz: result.result.skipQuizCount > 0
-          });
-          // 更新全局用户信息
-          getApp().globalData.userInfo.skipQuizCount = result.result.skipQuizCount;
-          // 延迟返回上一页
-          setTimeout(() => {
-            wx.navigateBack();
-          }, 1500);
-        } else {
-          wx.showToast({
-            title: result.result?.message || '使用失败',
-            icon: 'none'
-          });
-        }
-      },
-      fail: err => {
-        wx.hideLoading();
-
+    const app = getApp();
+    if (!app.globalData.userInfo || !app.globalData.userInfo.openid) {
+      wx.hideLoading();
+      wx.showToast({
+        title: '请先登录',
+        icon: 'none'
+      });
+      return;
+    }
+    
+    // 调用后端API使用免抽背特权
+    api.post(API.QUIZ.USE_SKIP_QUIZ, {
+      openid: app.globalData.userInfo.openid
+    }).then(res => {
+      wx.hideLoading();
+      
+      if (res.success) {
         wx.showToast({
-          title: '网络错误，请稍后重试',
+          title: '使用成功',
+          icon: 'success'
+        });
+        // 更新特权数量
+        this.setData({
+          skipQuizCount: res.user.skipQuizzes || 0,
+          canUseSkipQuiz: (res.user.skipQuizzes || 0) > 0
+        });
+        // 更新全局用户信息
+        getApp().globalData.userInfo = res.user;
+        // 延迟返回上一页
+        setTimeout(() => {
+          wx.navigateBack();
+        }, 1500);
+      } else {
+        wx.showToast({
+          title: res.message || '使用失败',
           icon: 'none'
         });
       }
+    }).catch(err => {
+      wx.hideLoading();
+      wx.showToast({
+        title: '网络错误，请稍后重试',
+        icon: 'none'
+      });
     });
   }
 });

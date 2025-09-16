@@ -1,4 +1,7 @@
 // 抽背记录页面逻辑
+// 导入API配置
+const { api, API } = require('../../utils/apiConfig');
+
 Page({
   data: {
     quizRecords: [],
@@ -49,46 +52,54 @@ Page({
       loading: true
     });
 
-    wx.cloud.callFunction({
-      name: 'getQuizHistory',
-      data: {
-        pageSize: this.data.pageSize,
-        pageNum: pageNum,
-        filterType: this.data.activeFilter
-      },
-      success: res => {
-        console.log('[云函数] [getQuizHistory] 成功：', res.result);
+    const app = getApp();
+    if (!app.globalData.userInfo || !app.globalData.userInfo.openid) {
+      wx.showToast({
+        title: '请先登录',
+        icon: 'none'
+      });
+      this.setData({
+        loading: false
+      });
+      wx.stopPullDownRefresh();
+      return;
+    }
+
+    api.get(API.QUIZ.GET_HISTORY, {
+      openid: app.globalData.userInfo.openid,
+      pageSize: this.data.pageSize,
+      pageNum: pageNum,
+      filterType: this.data.activeFilter
+    }).then(res => {
+      console.log('[API] [getQuizHistory] 成功：', res);
+      
+      if (res.success) {
+        const records = res.data.list || [];
+        const newRecords = pageNum === 1 ? records : [...this.data.quizRecords, ...records];
         
-        if (res.result.success) {
-          const records = res.result.data.list || [];
-          const newRecords = pageNum === 1 ? records : [...this.data.quizRecords, ...records];
-          
-          this.setData({
-            quizRecords: newRecords,
-            totalRecords: res.result.data.total,
-            currentPage: pageNum,
-            hasMore: res.result.data.hasMore
-          });
-        } else {
-          wx.showToast({
-            title: res.result.message || '获取记录失败',
-            icon: 'none'
-          });
-        }
-      },
-      fail: err => {
-        console.error('[云函数] [getQuizHistory] 调用失败：', err);
+        this.setData({
+          quizRecords: newRecords,
+          totalRecords: res.data.total,
+          currentPage: pageNum,
+          hasMore: res.data.hasMore
+        });
+      } else {
         wx.showToast({
-          title: '网络错误，请稍后重试',
+          title: res.message || '获取记录失败',
           icon: 'none'
         });
-      },
-      complete: () => {
-        this.setData({
-          loading: false
-        });
-        wx.stopPullDownRefresh();
       }
+    }).catch(err => {
+      console.error('[API] [getQuizHistory] 调用失败：', err);
+      wx.showToast({
+        title: '网络错误，请稍后重试',
+        icon: 'none'
+      });
+    }).finally(() => {
+      this.setData({
+        loading: false
+      });
+      wx.stopPullDownRefresh();
     });
   },
 
@@ -118,7 +129,7 @@ Page({
   goToUserProfile: function(e) {
     const userId = e.currentTarget.dataset.userId;
     
-    if (userId === getApp().globalData.userInfo._id) {
+    if (userId === getApp().globalData.userInfo.openid) {
       // 查看自己的资料
       wx.switchTab({
         url: '/pages/profile/profile'

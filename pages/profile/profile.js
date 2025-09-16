@@ -1,4 +1,7 @@
 // 个人信息页面逻辑
+// 导入API配置
+const { api, API } = require('../../utils/apiConfig');
+
 Page({
   data: {
     userInfo: {},
@@ -29,31 +32,46 @@ Page({
    * 获取用户详细信息
    */
   fetchUserDetail: function() {
-    const db = wx.cloud.database();
-    const userId = getApp().globalData.userInfo._id;
+    const app = getApp();
+    if (!app.globalData.userInfo || !app.globalData.userInfo.openid) {
+      wx.showToast({
+        title: '请先登录',
+        icon: 'none'
+      });
+      return;
+    }
 
-    db.collection('users').doc(userId).get({
-      success: res => {
-        const userData = res.data;
+    api.get(API.USER.GET_BY_OPENID, {
+      openid: app.globalData.userInfo.openid
+    }).then(res => {
+      if (res.success) {
+        const userData = res.user;
         this.setData({
-          score: userData.score || 0,
-          progress: userData.progress || { totalDays: 0, consecutiveDays: 0 },
+          score: userData.totalPoints || 0,
+          progress: {
+            totalDays: userData.totalDays || 0,
+            consecutiveDays: userData.consecutiveDays || 0
+          },
           privileges: {
-            skipCardCount: userData.skipCardCount || 0,
-            skipQuizCount: userData.skipQuizCount || 0
+            skipCardCount: userData.skipCards || 0,
+            skipQuizCount: userData.skipQuizzes || 0
           }
         });
 
         // 更新全局用户信息
         getApp().globalData.userInfo = userData;
-      },
-      fail: err => {
+      } else {
         wx.showToast({
-          title: '获取数据失败',
+          title: res.message || '获取数据失败',
           icon: 'none'
         });
-        console.error('[数据库] [查询用户信息] 失败：', err);
       }
+    }).catch(err => {
+      wx.showToast({
+        title: '获取数据失败',
+        icon: 'none'
+      });
+      console.error('[API] [查询用户信息] 失败：', err);
     });
   },
 
@@ -129,23 +147,36 @@ Page({
       title: '上传中...',
     });
 
-    // 生成一个唯一的文件名
-    const timestamp = Date.now();
-    const cloudPath = `avatars/${getApp().globalData.userInfo._id}_${timestamp}.png`;
-
-    // 上传头像到云存储
-    wx.cloud.uploadFile({
-      cloudPath: cloudPath,
+    // 调用后端API上传头像
+    const uploadTask = wx.uploadFile({
+      url: `${getApp().globalData.backendUrl}${API.USER.UPLOAD_AVATAR}`,
       filePath: avatarFilePath,
+      name: 'avatar',
+      formData: {
+        openid: getApp().globalData.userInfo.openid
+      },
       success: res => {
-        // 获取上传后的文件ID
-        const fileID = res.fileID;
-        console.log('头像上传成功，fileID:', fileID);
-
-        // 调用云函数更新用户信息
-        that.updateUserInfo({
-          avatarUrl: fileID
-        });
+        try {
+          const response = JSON.parse(res.data);
+          if (response.success) {
+            // 调用云函数更新用户信息
+            that.updateUserInfo({
+              avatarUrl: response.avatarUrl
+            });
+          } else {
+            wx.hideLoading();
+            wx.showToast({
+              title: response.message || '上传头像失败',
+              icon: 'none'
+            });
+          }
+        } catch (e) {
+          wx.hideLoading();
+          wx.showToast({
+            title: '上传头像失败',
+            icon: 'none'
+          });
+        }
       },
       fail: err => {
         console.error('头像上传失败:', err);
@@ -228,39 +259,45 @@ Page({
    */
   updateUserInfo: function(userInfo) {
     const that = this;
+    const app = getApp();
+    
+    if (!app.globalData.userInfo || !app.globalData.userInfo.openid) {
+      wx.hideLoading();
+      wx.showToast({
+        title: '请先登录',
+        icon: 'none'
+      });
+      return;
+    }
 
-    wx.cloud.callFunction({
-      name: 'updateUserInfo',
-      data: {
-        userInfo: userInfo
-      },
-      success: res => {
-        wx.hideLoading();
-        if (res.result && res.result.success) {
-          // 更新本地和全局用户信息
-          that.setData({
-            userInfo: res.result.user
-          });
-          getApp().globalData.userInfo = res.result.user;
+    api.post(API.USER.UPDATE, {
+      openid: app.globalData.userInfo.openid,
+      userInfo: userInfo
+    }).then(res => {
+      wx.hideLoading();
+      if (res.success) {
+        // 更新本地和全局用户信息
+        that.setData({
+          userInfo: res.user
+        });
+        getApp().globalData.userInfo = res.user;
 
-          wx.showToast({
-            title: '更新成功',
-            icon: 'success'
-          });
-        } else {
-          wx.showToast({
-            title: res.result?.message || '更新失败',
-            icon: 'none'
-          });
-        }
-      },
-      fail: err => {
-        wx.hideLoading();
         wx.showToast({
-          title: '网络错误，请稍后重试',
+          title: '更新成功',
+          icon: 'success'
+        });
+      } else {
+        wx.showToast({
+          title: res.message || '更新失败',
           icon: 'none'
         });
       }
+    }).catch(err => {
+      wx.hideLoading();
+      wx.showToast({
+        title: '网络错误，请稍后重试',
+        icon: 'none'
+      });
     });
   },
 

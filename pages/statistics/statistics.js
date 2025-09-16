@@ -1,4 +1,7 @@
 // 统计页面逻辑
+// 导入API配置
+const { api, API } = require('../../utils/apiConfig');
+
 Page({
   data: {
     weeklyData: [],
@@ -20,33 +23,43 @@ Page({
    * 获取统计数据
    */
   fetchStatisticsData: function() {
-    const db = wx.cloud.database();
-    const _ = db.command;
-    const userId = getApp().globalData.userInfo._id;
+    const app = getApp();
+    if (!app.globalData.userInfo || !app.globalData.userInfo.openid) {
+      wx.showToast({
+        title: '请先登录',
+        icon: 'none'
+      });
+      this.setData({ loading: false });
+      return;
+    }
 
     wx.showLoading({
       title: '加载中...',
     });
 
-    // 获取所有抽背记录
-    db.collection('quizzes').where({
-      userId: userId
-    }).get({
-      success: res => {
-        const quizzes = res.data;
+    // 调用后端API获取统计数据
+    api.get(API.STATISTICS.GET_BY_USER, {
+      openid: app.globalData.userInfo.openid
+    }).then(res => {
+      wx.hideLoading();
+      if (res.success) {
+        const quizzes = res.quizzes || [];
         this.processStatistics(quizzes);
-        wx.hideLoading();
-        this.setData({ loading: false });
-      },
-      fail: err => {
-        wx.hideLoading();
+      } else {
         wx.showToast({
-          title: '获取数据失败',
+          title: res.message || '获取数据失败',
           icon: 'none'
         });
-        console.error('[数据库] [查询抽背记录] 失败：', err);
-        this.setData({ loading: false });
       }
+      this.setData({ loading: false });
+    }).catch(err => {
+      wx.hideLoading();
+      wx.showToast({
+        title: '获取数据失败',
+        icon: 'none'
+      });
+      console.error('[API] [查询统计数据] 失败：', err);
+      this.setData({ loading: false });
     });
   },
 

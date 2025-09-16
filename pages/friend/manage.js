@@ -1,13 +1,14 @@
 /**
+// 导入API配置
+const { api, API } = require('../../utils/apiConfig');
+
+/**
  * 格式化日期时间
- * @param {Date|Object} date - 日期对象或数据库返回的日期对象
+ * @param {Date|String} date - 日期对象或日期字符串
  * @returns {String} 格式化后的日期字符串
  */
 function formatDate(date) {
-  // 处理数据库返回的日期对象
-  if (date && date.$date) {
-    date = new Date(date.$date);
-  } else if (!(date instanceof Date)) {
+  if (!(date instanceof Date)) {
     date = new Date(date);
   }
 
@@ -49,37 +50,36 @@ Page({
     this.fetchFriendRequests();
   },
 
-  
-
   /**
-   * 获取好友列表 - 使用getFriends操作
+   * 获取好友列表
    */
   fetchFriendList: function() {
     this.setData({ loading: true });
-    const userId = getApp().globalData.userInfo?._id;
-    console.log('[fetchFriendList] 当前用户ID:', userId);
+    const app = getApp();
+    if (!app.globalData.userInfo || !app.globalData.userInfo.openid) {
+      this.setData({ loading: false });
+      wx.showToast({
+        title: '请先登录',
+        icon: 'none'
+      });
+      return;
+    }
 
-    wx.cloud.callFunction({
-      name: 'friendRelation',
-      data: {
-        action: 'getFriends'
-      },
-      success: res => {
-        console.log('[云函数] [getFriends] 成功：', res.result);
-        console.log('[云函数] [getFriends] 完整返回：', res);
-        // 使用正确的路径获取好友列表数据
-        this.setData({
-          friends: res.result.friends || [],
-          loading: false
-        });
-      },
-      fail: err => {
-        this.setData({ loading: false });
-        wx.showToast({
-          title: '获取好友列表失败',
-          icon: 'none'
-        });
-      }
+    api.get(API.FRIEND.GET_FRIENDS, {
+      openid: app.globalData.userInfo.openid
+    }).then(res => {
+      console.log('[API] [getFriends] 成功：', res);
+      this.setData({
+        friends: res.friends || [],
+        loading: false
+      });
+    }).catch(err => {
+      console.error('[API] [getFriends] 失败：', err);
+      this.setData({ loading: false });
+      wx.showToast({
+        title: '获取好友列表失败',
+        icon: 'none'
+      });
     });
   },
 
@@ -87,18 +87,21 @@ Page({
    * 获取好友请求列表
    */
   fetchFriendRequests: function() {
-    const userId = getApp().globalData.userInfo?._id;
+    const app = getApp();
+    if (!app.globalData.userInfo || !app.globalData.userInfo.openid) {
+      wx.showToast({
+        title: '请先登录',
+        icon: 'none'
+      });
+      return;
+    }
 
-    wx.cloud.callFunction({
-      name: 'friendRelation',
-      data: {
-        action: 'getRequests'
-      },
-      success: res => {
-
-        
-        // 使用正确的路径获取好友请求数据，并格式化日期
-        const formattedRequests = (res.result.requests || []).map(request => ({
+    api.get(API.FRIEND.GET_REQUESTS, {
+      openid: app.globalData.userInfo.openid
+    }).then(res => {
+      if (res.success) {
+        // 格式化日期
+        const formattedRequests = (res.requests || []).map(request => ({
           ...request,
           requestTime: formatDate(request.requestTime)
         }));
@@ -114,14 +117,17 @@ Page({
             icon: 'none'
           });
         }
-      },
-      fail: err => {
-
+      } else {
         wx.showToast({
-          title: '获取好友请求失败',
+          title: res.message || '获取好友请求失败',
           icon: 'error'
         });
       }
+    }).catch(err => {
+      wx.showToast({
+        title: '获取好友请求失败',
+        icon: 'error'
+      });
     });
   },
 
@@ -144,11 +150,19 @@ Page({
   },
 
   /**
-   * 添加好友 - 使用sendRequest操作
+   * 添加好友
    */
   addFriend: function() {
     const targetUserId = this.data.searchUserId.trim();
-    const userId = getApp().globalData.userInfo._id;
+    const app = getApp();
+    
+    if (!app.globalData.userInfo || !app.globalData.userInfo.openid) {
+      wx.showToast({
+        title: '请先登录',
+        icon: 'none'
+      });
+      return;
+    }
 
     if (!targetUserId) {
       wx.showToast({
@@ -158,7 +172,7 @@ Page({
       return;
     }
 
-    if (targetUserId === userId) {
+    if (targetUserId === app.globalData.userInfo.openid) {
       wx.showToast({
         title: '不能添加自己为好友',
         icon: 'none'
@@ -170,40 +184,35 @@ Page({
       title: '发送请求中...',
     });
 
-    wx.cloud.callFunction({
-      name: 'friendRelation',
-      data: {
-        action: 'sendRequest',
-        targetUserId: targetUserId
-      },
-      success: res => {
-        wx.hideLoading();
+    api.post(API.FRIEND.SEND_REQUEST, {
+      openid: app.globalData.userInfo.openid,
+      targetOpenid: targetUserId
+    }).then(res => {
+      wx.hideLoading();
 
-        if (res.result.success) {
-          wx.showToast({
-            title: res.result.message || '好友请求已发送',
-            icon: 'success'
-          });
-
-          // 清空输入框
-          this.setData({ searchUserId: '' });
-
-          // 刷新好友请求列表
-          this.fetchFriendRequests();
-        } else {
-          wx.showToast({
-            title: res.result.message || '发送请求失败',
-            icon: 'none'
-          });
-        }
-      },
-      fail: err => {
-        wx.hideLoading();
+      if (res.success) {
         wx.showToast({
-          title: '发送请求失败',
+          title: res.message || '好友请求已发送',
+          icon: 'success'
+        });
+
+        // 清空输入框
+        this.setData({ searchUserId: '' });
+
+        // 刷新好友请求列表
+        this.fetchFriendRequests();
+      } else {
+        wx.showToast({
+          title: res.message || '发送请求失败',
           icon: 'none'
         });
       }
+    }).catch(err => {
+      wx.hideLoading();
+      wx.showToast({
+        title: '发送请求失败',
+        icon: 'none'
+      });
     });
   },
 
@@ -212,43 +221,47 @@ Page({
    */
   acceptFriendRequest: function(e) {
     const requestId = e.currentTarget.dataset.id;
+    const app = getApp();
+    
+    if (!app.globalData.userInfo || !app.globalData.userInfo.openid) {
+      wx.showToast({
+        title: '请先登录',
+        icon: 'none'
+      });
+      return;
+    }
 
     wx.showLoading({
       title: '处理中...',
     });
 
-    wx.cloud.callFunction({
-      name: 'friendRelation',
-      data: {
-        action: 'acceptRequest',
-        requestId: requestId
-      },
-      success: res => {
-        wx.hideLoading();
+    api.post(API.FRIEND.ACCEPT_REQUEST, {
+      openid: app.globalData.userInfo.openid,
+      requestId: requestId
+    }).then(res => {
+      wx.hideLoading();
 
-        if (res.result.success) {
-          wx.showToast({
-            title: '已添加为好友',
-            icon: 'success'
-          });
-
-          // 刷新好友列表和请求列表
-          this.fetchFriendList();
-          this.fetchFriendRequests();
-        } else {
-          wx.showToast({
-            title: res.result.message || '处理失败',
-            icon: 'none'
-          });
-        }
-      },
-      fail: err => {
-        wx.hideLoading();
+      if (res.success) {
         wx.showToast({
-          title: '处理失败',
+          title: '已添加为好友',
+          icon: 'success'
+        });
+
+        // 刷新好友列表和请求列表
+        this.fetchFriendList();
+        this.fetchFriendRequests();
+      } else {
+        wx.showToast({
+          title: res.message || '处理失败',
           icon: 'none'
         });
       }
+    }).catch(err => {
+      wx.hideLoading();
+      wx.showToast({
+        title: '处理失败',
+        icon: 'none'
+      });
     });
   },
 
@@ -257,51 +270,64 @@ Page({
    */
   rejectFriendRequest: function(e) {
     const requestId = e.currentTarget.dataset.id;
+    const app = getApp();
+    
+    if (!app.globalData.userInfo || !app.globalData.userInfo.openid) {
+      wx.showToast({
+        title: '请先登录',
+        icon: 'none'
+      });
+      return;
+    }
 
     wx.showLoading({
       title: '处理中...',
     });
 
-    wx.cloud.callFunction({
-      name: 'friendRelation',
-      data: {
-        action: 'rejectRequest',
-        requestId: requestId
-      },
-      success: res => {
-        wx.hideLoading();
+    api.post(API.FRIEND.REJECT_REQUEST, {
+      openid: app.globalData.userInfo.openid,
+      requestId: requestId
+    }).then(res => {
+      wx.hideLoading();
 
-        if (res.result.success) {
-          wx.showToast({
-            title: '已拒绝请求',
-            icon: 'success'
-          });
-
-          // 刷新请求列表
-          this.fetchFriendRequests();
-        } else {
-          wx.showToast({
-            title: res.result.message || '处理失败',
-            icon: 'none'
-          });
-        }
-      },
-      fail: err => {
-        wx.hideLoading();
+      if (res.success) {
         wx.showToast({
-          title: '处理失败',
+          title: '已拒绝请求',
+          icon: 'success'
+        });
+
+        // 刷新请求列表
+        this.fetchFriendRequests();
+      } else {
+        wx.showToast({
+          title: res.message || '处理失败',
           icon: 'none'
         });
       }
+    }).catch(err => {
+      wx.hideLoading();
+      wx.showToast({
+        title: '处理失败',
+        icon: 'none'
+      });
     });
   },
 
   /**
-   * 删除好友 - 使用deleteFriend操作
+   * 删除好友
    */
   deleteFriend: function(e) {
     const friendId = e.currentTarget.dataset.id;
     const friendName = e.currentTarget.dataset.name;
+    const app = getApp();
+    
+    if (!app.globalData.userInfo || !app.globalData.userInfo.openid) {
+      wx.showToast({
+        title: '请先登录',
+        icon: 'none'
+      });
+      return;
+    }
 
     wx.showModal({
       title: '删除好友',
@@ -312,37 +338,32 @@ Page({
             title: '删除中...',
           });
 
-          wx.cloud.callFunction({
-            name: 'friendRelation',
-            data: {
-              action: 'deleteFriend',
-              targetUserId: friendId
-            },
-            success: res => {
-              wx.hideLoading();
+          api.post(API.FRIEND.DELETE, {
+            openid: app.globalData.userInfo.openid,
+            friendOpenid: friendId
+          }).then(res => {
+            wx.hideLoading();
 
-              if (res.result.success) {
-                wx.showToast({
-                  title: '删除好友成功',
-                  icon: 'success'
-                });
-
-                // 刷新好友列表
-                this.fetchFriendList();
-              } else {
-                wx.showToast({
-                  title: res.result.message || '删除失败',
-                  icon: 'none'
-                });
-              }
-            },
-            fail: err => {
-              wx.hideLoading();
+            if (res.success) {
               wx.showToast({
-                title: '删除失败',
+                title: '删除好友成功',
+                icon: 'success'
+              });
+
+              // 刷新好友列表
+              this.fetchFriendList();
+            } else {
+              wx.showToast({
+                title: res.message || '删除失败',
                 icon: 'none'
               });
             }
+          }).catch(err => {
+            wx.hideLoading();
+            wx.showToast({
+              title: '删除失败',
+              icon: 'none'
+            });
           });
         }
       }
@@ -363,7 +384,7 @@ Page({
    * 复制用户ID到剪贴板
    */
   copyUserId: function() {
-    if (!this.data.userInfo || !this.data.userInfo._id) {
+    if (!this.data.userInfo || !this.data.userInfo.openid) {
       wx.showToast({
         title: '获取用户ID失败',
         icon: 'none'
@@ -372,7 +393,7 @@ Page({
     }
 
     wx.setClipboardData({
-      data: this.data.userInfo._id,
+      data: this.data.userInfo.openid,
       success: res => {
         wx.showToast({
           title: '复制成功',

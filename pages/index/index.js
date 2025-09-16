@@ -1,4 +1,7 @@
 // 首页逻辑
+// 导入API配置
+const { API, api } = require('../../utils/apiConfig');
+
 Page({
   data: {
     userInfo: {},
@@ -26,74 +29,79 @@ Page({
    * 获取用户统计数据
    */
   fetchUserStats: function() {
-    const db = wx.cloud.database();
-    const that = this;
+    const userInfo = getApp().globalData.userInfo;
+    if (!userInfo || !userInfo.openid) {
+      wx.showToast({
+        title: '请先登录',
+        icon: 'none'
+      });
+      return;
+    }
     
-    db.collection('users').doc(getApp().globalData.userInfo._id).get({
-      success: res => {
-        this.setData({
-          userInfo: res.data, // 更新用户信息
-          score: res.data.score || 0,
-          totalDays: res.data.progress?.totalDays || 0,
-          consecutiveDays: res.data.progress?.consecutiveDays || 0
-        });
-        
-        // 同时更新全局用户信息
-        getApp().globalData.userInfo = res.data;
-      },
-      fail: err => {
+    api.get(API.USER.GET_BY_OPENID + userInfo.openid)
+      .then(res => {
+        if (res.success && res.user) {
+          this.setData({
+            userInfo: res.user, // 更新用户信息
+            score: res.user.totalPoints || 0,
+            totalDays: res.user.totalDays || 0,
+            consecutiveDays: res.user.consecutiveDays || 0
+          });
+          
+          // 同时更新全局用户信息
+          getApp().globalData.userInfo = res.user;
+        }
+      })
+      .catch(err => {
         wx.showToast({
           title: '获取数据失败',
           icon: 'none'
         });
-      }
-    });
+      });
   },
 
   /**
    * 获取周报数据
    */
   fetchWeeklyReport: function() {
-    const db = wx.cloud.database();
-    const _ = db.command;
-    const now = new Date();
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
-    startOfWeek.setHours(0, 0, 0, 0);
+    const userInfo = getApp().globalData.userInfo;
+    if (!userInfo || !userInfo.openid) {
+      return;
+    }
+    
+    api.get(API.QUIZ.GET_HISTORY + userInfo.openid + '/history')
+      .then(res => {
+        if (res.success && res.quizRecords) {
+          const quizzes = res.quizRecords;
+          // 计算周报数据
+          let totalCorrect = 0;
+          let totalWrong = 0;
+          let quizCount = 0;
+          let fullMarkCount = 0;
 
-    db.collection('quizzes').where({
-      userId: getApp().globalData.userInfo._id,
-      date: _.gte(startOfWeek)
-    }).get({
-      success: res => {
-        const quizzes = res.data;
-        let totalCorrect = 0;
-        let totalWrong = 0;
-        let quizCount = 0;
-        let fullMarkCount = 0;
+          quizzes.forEach(item => {
+            totalCorrect += item.correctCount || 0;
+            totalWrong += item.wrongCount || 0;
+            quizCount++;
+            if (item.correctCount === 10 && item.wrongCount === 0) {
+              fullMarkCount++;
+            }
+          });
 
-        quizzes.forEach(item => {
-          totalCorrect += item.correctCount || 0;
-          totalWrong += item.wrongCount || 0;
-          quizCount++;
-          if (item.correctCount === 10 && item.wrongCount === 0) {
-            fullMarkCount++;
-          }
-        });
-
-        this.setData({
-          weeklyReport: {
-            quizCount: quizCount,
-            totalCorrect: totalCorrect,
-            totalWrong: totalWrong,
-            fullMarkCount: fullMarkCount,
-            accuracy: quizCount > 0 ? Math.round((totalCorrect / (totalCorrect + totalWrong)) * 100) : 0
-          }
-        });
-      },
-      fail: err => {
-      }
-    });
+          this.setData({
+            weeklyReport: {
+              quizCount: quizCount,
+              totalCorrect: totalCorrect,
+              totalWrong: totalWrong,
+              fullMarkCount: fullMarkCount,
+              accuracy: quizCount > 0 ? Math.round((totalCorrect / (totalCorrect + totalWrong)) * 100) : 0
+            }
+          });
+        }
+      })
+      .catch(err => {
+        console.error('获取周报数据失败:', err);
+      });
   },
 
   /**
