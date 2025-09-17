@@ -2,7 +2,7 @@
 // 后端服务基础URL
 // 注意：在微信小程序开发中，不能直接使用localhost，需要使用实际IP地址
 // 请将下面的IP地址替换为您本地电脑的实际IP地址
-const BASE_URL = 'http://10.1.10.151:3000/api';
+const BASE_URL = 'https://express-289r-187125-9-1305632701.sh.run.tcloudbase.com/api';
 
 // API接口路径配置
 const API = {
@@ -64,6 +64,8 @@ function request(method, url, data = {}, showLoading = true) {
       header: {
         'content-type': 'application/json',
       },
+      // 解决自签名证书问题
+      enableHttp2: true,
       success: (res) => {
         if (showLoading) {
           wx.hideLoading();
