@@ -7,7 +7,9 @@
     "pages/profile/profile",
     "pages/statistics/statistics",
     "pages/friend/manage",
-    "pages/quizHistory/quizHistory"
+    "pages/quizHistory/quizHistory",
+    "pages/agreement/user",
+    "pages/agreement/privacy"
   ],
   "window": {
     "backgroundTextStyle": "light",

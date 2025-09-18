@@ -2,7 +2,7 @@
 // 后端服务基础URL
 // 注意：在微信小程序开发中，不能直接使用localhost，需要使用实际IP地址
 // 请将下面的IP地址替换为您本地电脑的实际IP地址
-const BASE_URL = 'https://express-289r-187125-9-1305632701.sh.run.tcloudbase.com/api';
+const BASE_URL = 'uhbebtxa.express-289r.mwns65dw.rgy7vul9.com/api';
 
 // API接口路径配置
 const API = {

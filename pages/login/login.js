@@ -4,6 +4,10 @@ const { API, api } = require('../../utils/apiConfig');
 
 Page({
   data: {
+    isAgreed: false, // 协议同意状态
+    showModal: false, // 弹窗显示状态
+    modalTitle: '', // 弹窗标题
+    modalType: '' // 弹窗类型：'user'表示用户协议，'privacy'表示隐私政策
   },
 
   onLoad: function() {
@@ -11,9 +15,26 @@ Page({
   },
 
   /**
+   * 切换协议同意状态
+   */
+  toggleAgreement: function() {
+    this.setData({
+      isAgreed: !this.data.isAgreed
+    });
+  },
+
+  /**
    * 获取用户信息并登录
    */
   getUserProfile: function() {
+    // 检查是否同意协议
+    if (!this.data.isAgreed) {
+      wx.showToast({
+        title: '请先阅读并同意用户协议和隐私政策',
+        icon: 'none'
+      });
+      return;
+    }
     const that = this;
 
     wx.getUserProfile({
@@ -134,20 +155,33 @@ Page({
   },
 
   /**
-   * 查看用户协议
+   * 查看用户协议（弹窗形式）
    */
   viewUserAgreement: function() {
-    wx.navigateTo({
-      url: '/pages/agreement/user'
+    this.setData({
+      showModal: true,
+      modalTitle: '用户协议',
+      modalType: 'user'
     });
   },
 
   /**
-   * 查看隐私政策
+   * 查看隐私政策（弹窗形式）
    */
   viewPrivacyPolicy: function() {
-    wx.navigateTo({
-      url: '/pages/agreement/privacy'
+    this.setData({
+      showModal: true,
+      modalTitle: '隐私政策',
+      modalType: 'privacy'
+    });
+  },
+
+  /**
+   * 关闭协议弹窗
+   */
+  closeModal: function() {
+    this.setData({
+      showModal: false
     });
   }
 });
