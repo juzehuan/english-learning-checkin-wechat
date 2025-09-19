@@ -1,54 +1,52 @@
 // API配置文件
-// 后端服务基础URL
-// 注意：在微信小程序开发中，不能直接使用localhost，需要使用实际IP地址
-// 请将下面的IP地址替换为您本地电脑的实际IP地址
-const BASE_URL = 'uhbebtxa.express-289r.mwns65dw.rgy7vul9.com/api';
-
-// API接口路径配置
+// 使用微信云托管服务
+// 云托管服务名称
+const SERVICE_NAME = 'express-289r'; // 请替换为您的云托管服务名称
+// API基础路径前缀 - 需要包含/api前缀以匹配后端路由定义
 const API = {
   // 用户接口
   USER: {
-    CREATE_OR_UPDATE: `${BASE_URL}/users`,
-    GET_BY_OPENID: `${BASE_URL}/users/`, // 需拼接openid
-    UPDATE_POINTS: `${BASE_URL}/users/`, // 需拼接id/points
-    UPDATE: `${BASE_URL}/users/update`,
-    UPLOAD_AVATAR: `${BASE_URL}/users/uploadAvatar`,
-    WX_LOGIN: `${BASE_URL}/users/wxlogin`
+    CREATE_OR_UPDATE: '/api/users',
+    GET_BY_OPENID: '/api/users/', // 需拼接openid
+    UPDATE_POINTS: '/api/users/', // 需拼接id/points
+    UPDATE: '/api/users/update',
+    UPLOAD_AVATAR: '/api/users/uploadAvatar',
+    WX_LOGIN: '/api/users/wxlogin'
   },
 
   // 打卡接口
   SIGNIN: {
-    DAILY_SIGNIN: `${BASE_URL}/signin`,
-    GET_HISTORY: `${BASE_URL}/signin/`, // 需拼接openid/history
-    USE_SKIP_CARD: `${BASE_URL}/signin/skip`,
-    GET_STATS: `${BASE_URL}/signin/` // 需拼接openid/stats
+    DAILY_SIGNIN: '/api/signin',
+    GET_HISTORY: '/api/signin/', // 需拼接openid/history
+    USE_SKIP_CARD: '/api/signin/skip',
+    GET_STATS: '/api/signin/' // 需拼接openid/stats
   },
 
   // 抽背记录接口
   QUIZ: {
-    RECORD_RESULT: `${BASE_URL}/quiz`, // 同时作为CREATE_RECORD使用
-    USE_SKIP_QUIZ: `${BASE_URL}/quiz/skip`,
-    GET_HISTORY: `${BASE_URL}/quiz/` // 需拼接openid/history
+    RECORD_RESULT: '/api/quiz', // 同时作为CREATE_RECORD使用
+    USE_SKIP_QUIZ: '/api/quiz/skip',
+    GET_HISTORY: '/api/quiz/' // 需拼接openid/history
   },
 
   // 好友关系接口
   FRIEND: {
-    SEND_REQUEST: `${BASE_URL}/friend/sendRequest`,
-    ACCEPT_REQUEST: `${BASE_URL}/friend/acceptRequest`,
-    REJECT_REQUEST: `${BASE_URL}/friend/rejectRequest`,
-    DELETE_FRIEND: `${BASE_URL}/friend/deleteFriend`,
-    GET_FRIENDS: `${BASE_URL}/friend/getFriends/`, // 需拼接openid或使用查询参数
-    GET_REQUESTS: `${BASE_URL}/friend/getRequests/`, // 需拼接openid或使用查询参数
-    CHECK_RELATION: `${BASE_URL}/friend/checkRelation/` // 需拼接openid/targetUserId
+    SEND_REQUEST: '/api/friend/sendRequest',
+    ACCEPT_REQUEST: '/api/friend/acceptRequest',
+    REJECT_REQUEST: '/api/friend/rejectRequest',
+    DELETE_FRIEND: '/api/friend/deleteFriend',
+    GET_FRIENDS: '/api/friend/getFriends/', // 需拼接openid或使用查询参数
+    GET_REQUESTS: '/api/friend/getRequests/', // 需拼接openid或使用查询参数
+    CHECK_RELATION: '/api/friend/checkRelation/' // 需拼接openid/targetUserId
   },
 
   // 统计接口
   STATISTICS: {
-    GET_BY_USER: `${BASE_URL}/statistics/user`
+    GET_BY_USER: '/api/statistics/user'
   }
 };
 
-// 封装wx.request方法
+// 使用微信云托管的callContainer方法
 function request(method, url, data = {}, showLoading = true) {
   return new Promise((resolve, reject) => {
     if (showLoading) {
@@ -57,15 +55,17 @@ function request(method, url, data = {}, showLoading = true) {
       });
     }
 
-    wx.request({
-      url: url,
+    wx.cloud.callContainer({
+      config: {
+        env: 'prod-0g4esjft4f388f06' // 请替换为您的云托管环境ID
+      },
+      path: url,
       method: method,
       data: data,
       header: {
         'content-type': 'application/json',
+        'X-WX-SERVICE': SERVICE_NAME,
       },
-      // 解决自签名证书问题
-      enableHttp2: true,
       success: (res) => {
         if (showLoading) {
           wx.hideLoading();

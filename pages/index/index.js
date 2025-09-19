@@ -8,21 +8,45 @@ Page({
     score: 0,
     totalDays: 0,
     consecutiveDays: 0,
-    weeklyReport: {}
+    weeklyReport: {},
+    isLoggedIn: false
   },
 
   onLoad: function() {
+    // 初始化全局数据
+    const app = getApp();
+    // 确保globalData有默认值
+    if (app.globalData.isLoggedIn === undefined) {
+      app.globalData.isLoggedIn = false;
+    }
+    if (!app.globalData.userInfo) {
+      app.globalData.userInfo = {};
+    }
+    
     this.setData({
-      userInfo: getApp().globalData.userInfo
+      userInfo: app.globalData.userInfo,
+      isLoggedIn: app.globalData.isLoggedIn
     });
-    this.fetchUserStats();
-    this.fetchWeeklyReport();
+    
+    // 只有登录状态下才获取用户数据
+    if (app.globalData.isLoggedIn) {
+      this.fetchUserStats();
+      this.fetchWeeklyReport();
+    }
   },
 
   onShow: function() {
-    // 每次显示页面时刷新数据
-    this.fetchUserStats();
-    this.fetchWeeklyReport();
+    const app = getApp();
+    this.setData({
+      isLoggedIn: app.globalData.isLoggedIn,
+      userInfo: app.globalData.userInfo
+    });
+    
+    // 只有登录状态下才刷新数据
+    if (app.globalData.isLoggedIn) {
+      this.fetchUserStats();
+      this.fetchWeeklyReport();
+    }
   },
 
   /**
@@ -31,10 +55,6 @@ Page({
   fetchUserStats: function() {
     const userInfo = getApp().globalData.userInfo;
     if (!userInfo || !userInfo.openid) {
-      wx.showToast({
-        title: '请先登录',
-        icon: 'none'
-      });
       return;
     }
     
@@ -108,35 +128,72 @@ Page({
    * 跳转到打卡页面
    */
   navigateToSignin: function() {
-    wx.switchTab({
-      url: '/pages/signin/signin'
-    });
+    this.checkLoginAndNavigate('/pages/signin/signin', 'switchTab');
   },
 
   /**
    * 跳转到抽背页面
    */
   navigateToQuiz: function() {
-    wx.switchTab({
-      url: '/pages/quiz/quiz'
-    });
+    this.checkLoginAndNavigate('/pages/quiz/quiz', 'switchTab');
   },
 
   /**
    * 跳转到抽背历史记录页面
    */
   navigateToQuizHistory: function() {
-    wx.navigateTo({
-      url: '/pages/quizHistory/quizHistory'
-    });
+    this.checkLoginAndNavigate('/pages/quizHistory/quizHistory', 'navigateTo');
   },
 
   /**
    * 跳转到统计页面
    */
   navigateToStatistics: function() {
+    this.checkLoginAndNavigate('/pages/statistics/statistics', 'navigateTo');
+  },
+
+  /**
+   * 检查登录状态并导航
+   * @param {string} url - 目标页面路径
+   * @param {string} method - 导航方法：'navigateTo' 或 'switchTab'
+   */
+  checkLoginAndNavigate: function(url, method) {
+    const app = getApp();
+    if (!app.globalData.isLoggedIn) {
+      // 未登录时，先显示提示，然后跳转到登录页面
+      wx.showModal({
+        title: '提示',
+        content: '使用此功能需要先登录',
+        showCancel: false,
+        success: (res) => {
+          if (res.confirm) {
+            wx.navigateTo({
+              url: '/pages/login/login'
+            });
+          }
+        }
+      });
+      return;
+    }
+    
+    // 已登录时，正常导航
+    if (method === 'switchTab') {
+      wx.switchTab({
+        url: url
+      });
+    } else {
+      wx.navigateTo({
+        url: url
+      });
+    }
+  },
+  
+  /**
+   * 跳转到登录页面
+   */
+  goToLogin: function() {
     wx.navigateTo({
-      url: '/pages/statistics/statistics'
+      url: '/pages/login/login'
     });
   }
 });

@@ -5,6 +5,12 @@ const { API, api } = require('./utils/apiConfig');
 
 App({
   onLaunch: function() {
+    // 初始化微信云开发环境
+    wx.cloud.init({
+      env: 'prod-0g4esjft4f388f06', // 与apiConfig.js中的环境ID保持一致
+      traceUser: true
+    });
+    
     // 检查用户登录状态
     this.checkUserLogin();
   },
@@ -22,10 +28,9 @@ App({
         // 不再自动刷新用户信息，避免每次登录都更新
       },
       fail: function() {
-        // 用户未登录，跳转到登录页面
-        wx.redirectTo({
-          url: '/pages/login/login'
-        });
+        // 用户未登录，设置全局登录状态为false，但不强制跳转登录页面
+        // 用户可以先浏览首页内容，需要使用功能时再引导登录
+        that.globalData.isLoggedIn = false;
       }
     });
   },
@@ -57,7 +62,6 @@ App({
   globalData: {
     userInfo: null,
     isLoggedIn: false,
-    friendList: [],
-    backendUrl: 'http://localhost:3000/api'
+    friendList: []
   }
 });
